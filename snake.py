@@ -21,6 +21,8 @@ class Game():
     windowHeight - height of the window element
     windowWidth - width of the window element
     scale - determines 
+    noBoundry - can the snake go through walls
+    done - is the game done
     """
     rows = None
     cols = None
@@ -30,17 +32,17 @@ class Game():
     noBoundry = None
     done = None
     def __init__(self, fps, speed):
-        Game.cols = floor(Game.windowHeight/size - 1) #fix
+        Game.cols = floor(Game.windowHeight/size - 1) # - 1 so the the shape doesn't start at at the edge (meaning the rest of the shape is drawn out of the window)
         Game.rows = floor(Game.windowWidth/size - 1)
         Game.done = False
         self.screen = pygame.display.set_mode((Game.windowWidth, Game.windowHeight))
-        self.food = Food(Game.windowWidth, Game.windowHeight, Game.size)
+        self.food = Food(Game.size)
         self.snake = Snake(Game.size, self.food)
         self.clock = pygame.time.Clock()
         self.fps = fps
         self.speed = speed
         self.wait = False
-        
+
     def userInput(self, key):
         """
         Converts key press into action
@@ -67,10 +69,9 @@ class Game():
         """
         Main game loop. Handles movement and updating screen
         """
-        global moving
         moved = False
         timer = 0
-        buffer = []
+        inputBuffer = [] #holds the user input pressed while the snake is moving
         while not Game.done:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -80,32 +81,31 @@ class Game():
                     self.userInput(event.key)
                     moved = False
                 elif event.type == pygame.KEYDOWN and not moved:
-                    buffer.append(event.key)
+                    inputBuffer.append(event.key)
 
 
-            if buffer and moved:
-                for key in buffer:
-                    self.userInput(buffer.pop(0))
+            if inputBuffer and moved: #Empty buffer
+                #for key in buffer:
+                self.userInput(inputBuffer.pop(0))
+                moved = False
 
-            if timer * speed * Game.size > self.size:
+            if timer * speed * Game.size > self.size: #Controls the speed of the snake
                 timer = 0
                 self.snake.move()
                 moved = True
 
-            self.screen.fill((0, 0, 0))
-            pygame.draw.rect(self.screen, Snake.color, self.snake)
+            self.screen.fill((0, 0, 0)) #black
+            pygame.draw.rect(self.screen, Snake.color, self.snake) #draw head then food
             pygame.draw.rect(self.screen, Food.color, self.snake.food)
 
-            for block in self.snake.tail:
+            for block in self.snake.tail: #draw tail
                 pygame.draw.rect(self.screen, Snake.color, block)
                 pygame.draw.rect(self.screen, block.border_color, block.border, 1)
 
-            pygame.display.flip()
+            pygame.display.flip() #update display
 
-            timer += self.clock.tick(self.fps) / 1000 #fps
+            timer += self.clock.tick(self.fps) / 1000 
 
-    def end(self):
-        self.snake.changeDirection(Direction.NONE)
 
 class Direction(Enum):
     """
@@ -118,7 +118,7 @@ class Direction(Enum):
     NONE = [0, 0]
 
     def flip(self):
-        """Flip the direction"""
+        """Flip the direction (negate both sides)"""
         return [-self.value[0], -self.value[1]]
 
     def __eq__(self, other):
@@ -127,20 +127,33 @@ class Direction(Enum):
 
 
 class Block(pygame.Rect):
+    """
+    Object used to represent the tail of the snake. 
+    """
     def __init__(self, size, x, y):
         self.width = size
         self.height = size
         self.x = x
         self.y = y
-        self.border = pygame.Rect(self.x, self.y, size+1, size+1).clamp(self)
+        self.border = pygame.Rect(self.x, self.y, size+1, size+1).clamp(self) #attach another rectanlge to the block in order to create a border
         self.border_color = (0, 0, 0)
         self.safe = False
 
 
 class Food(pygame.Rect):
+    """
+    Object used to represent the food that the snake is after
+
+    Public Methods:
+    relocate()
+    isSafe(rect)
+
+    Instance Variables:
+    color - color of the food - pink
+    """
     color = (255, 0, 100)
 
-    def __init__(self, windowWidth, windowHeight, size):
+    def __init__(self, size):
         self.width = size
         self.height = size
         self.relocate()
@@ -162,6 +175,22 @@ class Food(pygame.Rect):
 
 
 class Snake(pygame.Rect):
+    """
+    Class to represent the snake object
+
+    Public Methods:
+    eat()
+    changeDirection(direction)
+    getDirection()
+    move()
+    checkEat()
+    hitWall()
+    hitSelf()
+    die()
+
+    Instance Variables:
+    color - the Color of the snake (blue)
+    """
     color = (0, 128, 255) 
 
     def __init__(self, startingSize, food):
@@ -181,10 +210,12 @@ class Snake(pygame.Rect):
         safe = False
         while not safe:
             self.food.relocate()
-            i = 0
+
+            # i = 0
             for i, t in enumerate(self.tail):
                 if not self.food.isSafe(t):
                     break
+
             if i != len(self.tail) - 1:
                 continue
             
@@ -193,21 +224,24 @@ class Snake(pygame.Rect):
 
     def changeDirection(self, direction):
         """Change the direction of the snake"""
-        print(f"\ndirection = {direction} and self.direction = {self.getDirection()}")
-        if (direction == self.getDirection() or direction == self.getDirection().flip()) and not len(self.tail) == 0:
-            print("no change")
+        #You can't go backwards into yourself, and don't do anything if you're already going that direction
+        #If you're just a head, you can go backwards
+        if (direction == self.getDirection() or direction == self.getDirection().flip()) and not len(self.tail) == 0: 
             return
+        
         self.dx, self.dy = direction.value
 
     def getDirection(self):
+        """Returns the current direction of the snake"""
         return Direction([self.dx, self.dy])
 
     def move(self):
-        """Move the snake.
+        """
+        Move the snake.
         
         The snake moves by shifting the entire array of the tail to the left (removing the last
-        element) and putting a new Block where the head used to be. """
-        print("moving")
+        element) and putting a new Block where the head used to be. 
+        """
         for i, t in enumerate(self.tail):
             if i == len(self.tail) - 1:
                 break
@@ -220,7 +254,8 @@ class Snake(pygame.Rect):
         self.x += self.dx
 
         self.hitWall()
-        if not self.checkEat():
+
+        if not self.checkEat(): #Only check if the snake hits itself if it didn't eat, eating causes another block to be placed exactly where the snake is
             self.hitSelf()
 
     def checkEat(self):
@@ -235,7 +270,7 @@ class Snake(pygame.Rect):
         """Check if the snake hit the wall"""
 
         global noBoundry
-        if self.x < 0 or self.y < 0 or self.x > Game.windowWidth - self.width or self.y > Game.windowHeight - self.height:
+        if self.x < 0 or self.y < 0 or self.x > Game.windowWidth - self.width or self.y > Game.windowHeight - self.height: #hit edge of screen
             if not noBoundry:
                 self.die()
             else:
@@ -254,14 +289,10 @@ class Snake(pygame.Rect):
         """Check if the snake head hit part of it's tail"""
         for block in self.tail:
             if self.colliderect(block):
-                print("ouch")
-                print(block)
-                print(self)
-                print(self.getDirection())
                 self.die()
 
     def die(self):
-        """Kill the snake"""
+        """Kill the snake, end the game"""
         self.changeDirection(Direction.NONE)
         print("You have died! Game Over")
         Game.done = True
