@@ -347,7 +347,7 @@ class Snake(Block):
         Return - True if the snake would collide, False otherwise
         """
         for block in self.tail:
-            if Block(self.game.size, self.x + check.value[0], self.y + check.value[1]).colliderect(block):
+            if Block(self.game.size, self.x + check.value[0] * self.game.size, self.y + check.value[1] * self.game.size).colliderect(block):
                 return True
         return False
 
@@ -373,8 +373,7 @@ def main():
     """
     Main entry into the program, creates a game and plays it
     """
-    size = 40
-    game = Game(size, 60, 600, 800, 10, True, True)
+    game = Game(40, 60, 600, 800, 10, True, True)
     game.play()
 
 
