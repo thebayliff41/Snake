@@ -1,7 +1,7 @@
+#! /usr/bin/env python3
 from enum import Enum
 from random import randint
 from math import floor
-import numpy as np
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
