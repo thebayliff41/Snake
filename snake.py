@@ -3,7 +3,7 @@ from enum import Enum
 from random import randint
 from math import floor
 import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide" #Don't show the pygame startup message
 import pygame
 
 class Game():
@@ -23,7 +23,7 @@ class Game():
     done - is the game done
     """
 
-    def __init__(self, size, fps, windowHeight, windowWidth, speed, noBoundry = False, assist = False):
+    def __init__(self, size=40, fps=60, windowHeight=600, windowWidth=800, speed=10, noBoundry = False, assist = False):
         pygame.init()
         self.size = size
         self.windowWidth = windowWidth
@@ -55,13 +55,13 @@ class Game():
         Arguments:
         key - the key that was pressed
         """
-        if key == pygame.K_UP:
+        if key == pygame.K_UP or key == pygame.K_w:
             self.snake.changeDirection(Direction.UP)
-        elif key == pygame.K_DOWN:
+        elif key == pygame.K_DOWN or key == pygame.K_s:
             self.snake.changeDirection(Direction.DOWN)
-        elif key == pygame.K_LEFT:
+        elif key == pygame.K_LEFT or key == pygame.K_a:
             self.snake.changeDirection(Direction.LEFT)
-        elif key == pygame.K_RIGHT:
+        elif key == pygame.K_RIGHT or key == pygame.K_d:
             self.snake.changeDirection(Direction.RIGHT)
         elif key == pygame.K_j:
             self.snake.die()
@@ -84,32 +84,35 @@ class Game():
                 elif event.type == pygame.KEYDOWN and not moved:
                     inputBuffer.append(event.key)
 
-            if inputBuffer and moved:  # Empty buffer
-                self.userInput(inputBuffer.pop(0))
-                moved = False
-
             if timer * self.speed  > 1:  # Controls the speed of the snake
                 timer = 0
                 self.snake.move()
                 moved = True
 
-            self.screen.fill((0, 0, 0))  # black
+            if inputBuffer and moved:  # Empty buffer
+                self.userInput(inputBuffer.pop(0))
+                moved = False
 
-            self.score.draw()
-
-
-            for block in self.snake.tail:  # draw tail
-                pygame.draw.rect(self.screen, Block.color, block)
-                pygame.draw.rect(
-                    self.screen, block.border_color, block.border, 1)
-
-            pygame.draw.rect(self.screen, Snake.color,
-                             self.snake)  # draw head then food
-            pygame.draw.rect(self.screen, Food.color, self.food)
-
-            pygame.display.flip()  # update display
-
+            self.drawBoard()
             timer += self.clock.tick(self.fps) / 1000
+  
+    def drawBoard(self):
+        """
+        Draws the board drawing the snake, food, and score to the screen and updating the screen
+        accordingly
+        """
+        self.screen.fill((0, 0, 0))  # black
+
+        for block in self.snake.tail:  # draw tail
+            pygame.draw.rect(self.screen, Block.color, block)
+            pygame.draw.rect(self.screen, block.border_color, block.border, 1)
+
+        pygame.draw.rect(self.screen, Snake.color,
+                            self.snake)  # draw head then food
+        pygame.draw.rect(self.screen, Food.color, self.food)
+
+        self.score.draw()
+        pygame.display.flip()  # update display
 
 
 class Score():
@@ -317,9 +320,10 @@ class Snake(Block):
     def die(self):
         """Kill the snake, end the game"""
         self.game.done = True
-        self.changeDirection(Direction.NONE)
+        #self.changeDirection(Direction.NONE)
         print("You have died! Game Over")
         print(f"Final score = {self.game.score.value}")
+        print(self.tail)
 
     def safeDirections(self):
         """
