@@ -1,0 +1,15 @@
+from pandas import DataFrame
+COLUMNS = ["UP", "DOWN", "LEFT", "RIGHT"]
+INITIAL_DATAFRAME = DataFrame([[0, 0, 0, 0]], columns=COLUMNS)
+BLOCK_SIZE = 40
+WINDOW_WIDTH = 800
+WINDOW_HEIGHT = 600
+
+#Colors
+WHITE = (255, 255, 255)
+BLUE = (0, 128, 255)
+PINK = (255, 0, 100)
+GREEN = (124, 252, 0)
+PURPLE = (128, 0, 128)
+BLACK = (0, 0, 0)
+YELLOW = (255, 250, 205)
