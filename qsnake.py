@@ -7,6 +7,10 @@ import pandas as pd
 from random import randint
 import bitmap
 import itertools
+import statistics
+import datetime
+from scipy.stats import describe
+import json
 
 
 class QGame(snake.Game):
@@ -16,10 +20,8 @@ class QGame(snake.Game):
     Inherits from snake.Game
     """
 
-    def __init__(self, training=False):
-        # snake.Game.__init__(self, noBoundry=True, assist=True)
-        # snake.Game.__init__(self)
-        snake.Game.__init__(self, windowWidth=1280, noBoundry=True, assist=True)
+    def __init__(self, training=False, watchTraining=False):
+        snake.Game.__init__(self, windowWidth=1280, noBoundry=False, assist=False)
         self.snake = Snake(self)
         self.current_state = QTable.encodeState(self.snake, self.food)
         self.qTable = QTable(self)
@@ -27,6 +29,7 @@ class QGame(snake.Game):
         self.speedOfUpdate = 1.5
         self.pause = False
         self.training = training
+        self.watchTraining = watchTraining if training else True
         self.text.append(snake.DisplayText(self.screen, (10, 30), "Learning Rate: ", str(.1)))
         self.text.append(snake.DisplayText(self.screen, (10, 50), "Discount Factor: ", str(.9)))
         self.text.append(snake.DisplayText(self.screen, (10, 70), "Current Encoded State: ", self.current_state))
@@ -48,9 +51,9 @@ class QGame(snake.Game):
             self.speedOfUpdate += .1
         elif key == pygame.K_UP:
             self.speedOfUpdate -= .1
-        elif key == pygame.K_SPACE:
+        elif key == pygame.K_SPACE and not self.training:
             self.pause = ~self.pause
-        elif key == pygame.K_s and self.pause:
+        elif key == pygame.K_s and self.pause and self.watchTraining:
             self.step()
             self.drawBoard()
 
@@ -84,20 +87,26 @@ class QGame(snake.Game):
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.done = True
+                    quit()
                 if event.type == pygame.KEYDOWN:
                     self.userInput(event.key)
 
             if self.pause:
                 continue
 
-            if timer * self.speed > self.speedOfUpdate:  # Controls the speed of the snake
+            if self.training and not self.watchTraining or timer * self.speed > self.speedOfUpdate:  # Controls the speed of the snake
                 timer = 0
                 self.step()
 
-            # if not self.training:
-            self.drawBoard()
+            if not self.training or (self.watchTraining and self.training):
+                self.drawBoard()
+                timer += self.clock.tick(self.fps) / 1000
+            else:
+                self.drawBoard()
+                self.step()
+                self.clock.tick()
 
-            timer += self.clock.tick(self.fps) / 1000
+
 
     def reset(self, learning_rate=None, discount_factor=None, assist=None, noBoundry=None, training=None):
         """
@@ -112,6 +121,7 @@ class QGame(snake.Game):
         discount_factor = discount_factor if discount_factor != None else self.qTable.discount_factor
         assist = assist if assist != None else self.assist
         noBoundry = noBoundry if noBoundry != None else self.noBoundry
+        self.watchTraining = False if not training else self.watchTraining
         self.training = training if training != None else self.training
         self.qTable.setLearning(learning)
         self.qTable.setDiscount(discount_factor)
@@ -136,21 +146,21 @@ class QTable(pd.DataFrame):
     findIndiciesOfOccurences()
     """
 
-    def __init__(self, game, learning_rate=.1, discount_factor=.9):
+    def __init__(self, game, learning_rate=.1, discount_factor=.9, epsilon=0):
         pd.DataFrame.__init__(self, columns=constant.COLUMNS, dtype=np.float32)
         self.game=game
         self.learning_rate=learning_rate
         self.discount_factor=discount_factor
+        self.epsilon = epsilon
 
     def setLearning(self, value):
-        print(f"setting learning rate to {value}")
         self.learning_rate = value
 
     def setDiscount(self, value):
         self.discount_factor = value
 
     @staticmethod
-    def findIndiciesOfOccurences(row, check_value, currentDirection):
+    def findIndiciesOfOccurences(row, check_value):
         """
         Finds the indexes of the given value in the given row.
 
@@ -170,7 +180,6 @@ class QTable(pd.DataFrame):
         index - the name for the row that will be added.
         """
         columns = [direction.name for direction in snake.Direction if direction.name != snake_obj.getDirection().flips().name and direction.name != "NONE"]
-        print(f"adding columns: {columns}")
         newQTable=self.append(
             pd.DataFrame(
                 [[0, 0, 0]], index=[index], columns=columns))
@@ -201,15 +210,14 @@ class QTable(pd.DataFrame):
 
         returns the action for the actor to take by the name value of the Direction enum.
         """
-        # if randint(0, 10) * .1 < self.learning_rate:  # *.1 in order to convert the int to a decimal and 0,10 for 0, 100%
-        #     available_directions=self.__getAvailableDirections()
-        #     print("choosing random action")
-        #     next_action=available_directions[randint(
-        #         0, len(available_directions)-1)]
-        # # else:
-        if True:
+        if randint(0, 10) * .1 < self.epsilon:  # *.1 in order to convert the int to a decimal and 0,10 for 0, 100%
+            available_directions=self.__getAvailableDirections()
+            next_action=available_directions[randint(
+                0, len(available_directions)-1)]
+        else:
+        # if True:
             possible_actions=QTable.findIndiciesOfOccurences(self.getRow(
-                self.game.current_state, self.game.snake), self.getRow(self.game.current_state, self.game.snake).max(), self.game.snake.getDirection())
+                self.game.current_state, self.game.snake), self.getRow(self.game.current_state, self.game.snake).max())
             next_action=possible_actions[randint(0, len(possible_actions)-1)]
         return next_action
 
@@ -373,7 +381,6 @@ class Snake(snake.Snake):
             reward = -.2
 
         self.last_distance = new_distance
-        print(f"reward = {reward}")
 
         return reward
 
@@ -382,27 +389,99 @@ class Snake(snake.Snake):
         Print the QTable upon death
         """
         self.game.done = True
-        print(f"Final score = {self.game.score}")
-        print(self.game.qTable)
+        # print(f"Final score = {self.game.score}")
+        # print(self.game.qTable)
+
+def experiment(replications, trials):
+    """
+    Train the snake over different trial counts; each trial count is replicated multiple times.
+
+    Argument List:
+    replications - Number of replications
+    trials - Number of trials per replication
+
+    returns list of scores; len(list) == replications
+    """
+    final_scores = []
+    for replication in range(0, replications):
+        print(f"replication = {replication}")
+        game = QGame(training=True)
+        for trial in range(0, trials):
+            print(f"trial = {trial}")
+            game.play()
+            game.reset()
+        game.reset(learning_rate=0)
+        game.play()
+        final_scores += [game.score.value]
+
+    return final_scores
+
+def train(replications, trial_set, out_file_name=None):
+    records = []
+    out_file = None
+
+    if out_file_name:
+        out_file = open(out_file_name, 'a')
+
+    for trials in trial_set:
+        final_scores = experiment(replications, trials)
+        record = {
+            'trials': trials,
+            'replications': replications,
+            'final_scores': final_scores
+        }
+        records += [record]
+    if out_file:    
+        out_file.write(records)
+    else:
+        for record in records:
+            print(f"Trials: {trials}; Replications: {replications}")
+            print(describe(record['final_scores']))
+
+    if out_file:
+        out_file.close()
 
 def main():
     # 14 cols, 19 rows
-    game=QGame(training=True)
-    game.play()
-    training_score = []
-    until = 3
-    for i in range(0, until): #Train games then for real
-        game.play()
-        training_score.append(game.score.value)
-        if i != until:
-            game.reset()
-        else:
-            print("real game")
-            game.reset(0, .9, False, False, False)
-    # input("waiting to continue") #Wait for input before going to the last game.
-    game.play()
-    print(training_score)
-    print(game.score.value)
+    # game=QGame(training=True)
+    # game=QGame()
+    # numTraining = [i for i in range(10, 100 + 10, 10)]
+    # numRep = 100
+    # f = open("training", "a")
+    # f.write(f"Started {datetime.datetime.now()}\n")
+    # for episodes in numTraining:
+    #     game=QGame(training=True)
+    #     print(f"{episodes} episodes:")
+    #     finals = []
+    #     for trial in range(0, episodes):
+    #         game.play()
+    #         training_score = []
+    #         # until = 100
+    #         for i in range(0, numRep): #Train games then for real
+    #             game.play()
+    #             training_score.append(game.score.value)
+    #             if i != numRep:
+    #                 game.reset()
+    #                 # game.reset(0, .9, False, False, False)
+    #             else:
+    #                 game.reset(learning_rate=0, discount_factor=.9, assist=False, noBoundry=False)
+    #         # input("waiting to continue") #Wait for input before going to the last game.
+    #         game.play()
+    #         # print(training_score)
+    #         # print(game.score.value)
+    #         finals.append(game.score.value)
+    #     f.write(', '.join(str(finals)) + '\n')
+    #     conclusion = f"variance = {statistics.variance(finals)}, stddev = {statistics.stdev(finals)}\
+    #         min = {min(finals)}, max = {max(finals)}, mean = {statistics.mean(finals)}, median = \
+    #         {statistics.median(finals)}, mode = {statistics.multimode(finals)}\n"
+    #     print(conclusion)
+    #     f.write(conclusion)
+    # f.write(f"Ended {datetime.datetime.now()}")
+
+    train(100, [10])
+    
+    #game = QGame()
+    #game.play()
 
 
 if __name__ == "__main__":

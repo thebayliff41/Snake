@@ -325,16 +325,7 @@ class Snake(Block):
         self.hitWall()
         if self.hit_wall:
             if self.game.noBoundry:
-                if self.x < self.game.leftBoundry:
-                    self.x = self.game.rightBoundry - self.game.size
-                elif self.y < 0:
-                    self.y = self.game.gameHeight - self.game.size
-                elif self.x > self.game.rightBoundry - self.game.size:
-                    self.x = self.game.leftBoundry
-                elif self.y > self.game.gameHeight - self.game.size:
-                    self.y = 0
-                else:
-                    raise RunTimeError("Position invalid")
+                self.__goThroughWall()
             elif self.game.assist:
                 self.assist()
             else:
@@ -409,13 +400,46 @@ class Snake(Block):
                 if Block(self.game.size, self.x + item.value[0] * self.game.size, self.y + item.value[1] * self.game.size).colliderect(block):
                     list.remove(item)
 
+    def __unmove(self):
+        """
+        Undo the last move
+        """
+        self.x -= self.dx
+        self.y -= self.dy
+
+        self.hitWall()
+        if self.hit_wall:
+            if self.game.noBoundry:
+                self.__goThroughWall()
+            elif self.game.assist:
+                self.assist()
+            else:
+                self.die()
+
+        self.checkEat()
+
+    def __goThroughWall(self):
+        """
+        Transport through the wall
+        """
+        if self.x < self.game.leftBoundry:
+            self.x = self.game.rightBoundry - self.game.size
+        elif self.y < 0:
+            self.y = self.game.gameHeight - self.game.size
+        elif self.x > self.game.rightBoundry - self.game.size:
+            self.x = self.game.leftBoundry
+        elif self.y > self.game.gameHeight - self.game.size:
+            self.y = 0
+        else:
+            raise RunTimeError("Position invalid")
+            
+
     def assist(self):
         """
         Assist the snake if it hits itself. Causes the snake to instead choose a random, safe direction to turn.
         """
         #Move snake back from bad move
-        self.x -= self.dx
-        self.y -= self.dy
+        self.__unmove()
         safeDirections = self.safeDirections()
         if len(safeDirections) == 0:
             self.die()
