@@ -23,7 +23,7 @@ class Game():
     done - is the game done
     """
 
-    def __init__(self, size=40, fps=60, windowHeight=600, windowWidth=960, gameHeight=600, gameWidth=800, speed=10, noBoundry = False, assist = False):
+    def __init__(self, size=40, fps=60, windowHeight=600, windowWidth=960, gameHeight=600, gameWidth=800, speed=10, noBoundry = False, assist = False, screen=True):
         pygame.init()
         self.size = size
         self.windowWidth = windowWidth
@@ -36,18 +36,28 @@ class Game():
         # - 1 so the the shape doesn't start at at the edge (meaning the rest of the shape is drawn out of the window)
         self.cols = floor(gameHeight/size - 1)
         self.rows = floor(gameWidth/size - 1)
+        self.score = 0
         self.done = False
-        self.screen = pygame.display.set_mode((windowWidth, windowHeight))
+        self.text = []
+        if screen:
+            self.screen = pygame.display.set_mode((windowWidth, windowHeight))
+        else:
+            self.watchTraining = False
+            self.screen = None
+
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.Font(None, 36)
+        self.scoreText = Score(self.screen, (10, 10), self.font)
+        self.text.append(self.scoreText)
+ 
         self.snake = Snake(self)
         self.food = Food(self)
-        self.clock = pygame.time.Clock()
+
         self.fps = fps
         self.speed = speed
         self.wait = False
-        self.score = Score(self.screen, (10, 10))
         self.noBoundry = noBoundry
         self.assist = assist
-        self.text = [self.score]
 
     def userInput(self, key):
         """
@@ -149,6 +159,7 @@ class Direction(Enum):
 
 
 class Block(pygame.Rect):
+
     """
     Object used to represent all squares in the game
 
@@ -178,8 +189,8 @@ class DisplayText():
     draw() - draws the text to the screen
     reset() - resets the text to whatever is supplied
     """
-    def __init__(self, screen,location, baseString, displayString=""):
-        self.font = pygame.font.Font(None, 36)
+    def __init__(self, screen,location, baseString, font, displayString=""):
+        self.font = font
         self.displayString = displayString
         self.location = location
         self.screen = screen
@@ -193,6 +204,9 @@ class DisplayText():
         self.displayString = displayString if displayString else self.displayString
         self.baseString = baseString if baseString else self.baseString
 
+    def setScreen(self, screen):
+        self.screen = screen
+
 class Score(DisplayText):
     """
     Represents the score of the game
@@ -201,9 +215,9 @@ class Score(DisplayText):
     draw() - draws the score on the screen
     changeScore() - changes the score by the given number (positive or negative)
     """
-    def __init__(self, screen,location):
+    def __init__(self, screen,location, font):
         self.value = 0
-        super().__init__(screen, location, "Score: ", str(self.value))
+        super().__init__(screen, location, "Score: ", font, str(self.value))
 
     def changeScore(self, change):
         self.value += change
@@ -242,7 +256,7 @@ class Food(Block):
 
         return - True if safe (not inside any part of snake), False otherwise
         """
-        for block in self.game.snake.tail:
+        for block in self.game.snake.tail + [self.game.snake]: #Must include head
             if self.colliderect(block):
                 return False
         return True
@@ -276,17 +290,20 @@ class Snake(Block):
         self.hit_wall = False
         self.hit_self = False
 
-    def checkEat(self):
+    def checkEat(self, newX, newY):
         """
         Checks if the snake is colliding with the food object.
         Updates the score if the food is eaten.
 
         returns True if colliding and False otherwise
         """
-        if self.colliderect(self.game.food):
+        newBlock = Block(self.width, newX, newY)
+        if newBlock.colliderect(self.game.food):
             self.game.food.relocate()
-            self.tail.append(Block(self.game.size, self.x, self.y))
-            self.game.score.changeScore(1)
+            self.tail.append(newBlock)
+            self.game.score += 1
+            if hasattr(self.game, 'scoreText'):
+                self.game.scoreText.changeScore(1)
             return True
         else:
             return False
@@ -319,38 +336,46 @@ class Snake(Block):
             for block in self.tail[1:]:
                 block.resetColor()
             self.tail[0].color = (255, 250, 205)
-        self.y += self.dy # Move head
-        self.x += self.dx 
 
-        self.hitWall()
+        newY = self.dy + self.y
+        newX = self.dx + self.x
+
+        self.hitWall(newX, newY)
         if self.hit_wall:
             if self.game.noBoundry:
-                self.__goThroughWall()
+                self.__goThroughWall(newX, newY)
             elif self.game.assist:
                 self.assist()
             else:
                 self.die()
+            return
 
-        if not self.checkEat():  # Only check if the snake hits itself if it didn't eat, eating causes another block to be placed exactly where the snake is
-            self.hitSelf()
+        if not self.checkEat(newX, newY):  # Only check if the snake hits itself if it didn't eat, eating causes another block to be placed exactly where the snake is
+            self.hitSelf(newX, newY)
             if self.hit_self:
                 if self.game.assist:
                     self.assist()
                 else:
                     self.die()
                 self.hit_self = False
+                return #Don't update the snake if bad move
 
-    def hitWall(self):
+        self.y = newY
+        self.x = newX
+
+
+    def hitWall(self, newX, newY):
         """Check if the snake hit the wall"""
-        if self.x < self.game.leftBoundry or self.y < 0 or self.x > self.game.rightBoundry - self.game.size or self.y > self.game.gameHeight - self.game.size:  # hit edge of screen
+        if newX < self.game.leftBoundry or newY < 0 or newX > self.game.rightBoundry - self.game.size or newY > self.game.gameHeight - self.game.size:  # hit edge of screen
             self.hit_wall = True
         else:
             self.hit_wall = False
 
-    def hitSelf(self):
+    def hitSelf(self, newX, newY):
         """Check if the snake head hit part of it's tail"""
+        newBlock = Block(self.width, newX, newY)
         for block in self.tail:
-            if self.colliderect(block):
+            if newBlock.colliderect(block):
                 self.hit_self = True
                 return
         self.hit_self = False
@@ -359,7 +384,7 @@ class Snake(Block):
         """Kill the snake, end the game"""
         self.game.done = True
         print("You have died! Game Over")
-        print(f"Final score = {self.game.score.value}")
+        print(f"Final score = {self.game.score}")
 
     def safeDirections(self):
         """
@@ -375,18 +400,18 @@ class Snake(Block):
 
         return safe
 
-    def checkCollideWithWall(self, list):
+    def checkCollideWithWall(self, directions):
         """
         Checks if the directions in the given list would cause a collision with a wall
 
         Arguments:
         list - a list of directions
         """
-        for item in list:
+        for item in directions:
             if self.x + item.value[0] < self.game.leftBoundry or self.y + item.value[1] < 0 or self.x + item.value[0] > self.game.rightBoundry - self.game.size or self.y + item.value[1] > self.game.gameHeight - self.game.size:
-                list.remove(item)
+                directions.remove(item)
 
-    def checkCollideWithTail(self, list):
+    def checkCollideWithTail(self, directions):
         """
         Checks if the given direction would cause a collision with the tailof the snake
 
@@ -396,9 +421,9 @@ class Snake(Block):
         for block in self.tail:
             if block == self.tail[1]:
                 continue
-            for item in list:
+            for item in directions:
                 if Block(self.game.size, self.x + item.value[0] * self.game.size, self.y + item.value[1] * self.game.size).colliderect(block):
-                    list.remove(item)
+                    directions.remove(item)
 
     def __unmove(self):
         """
@@ -418,17 +443,17 @@ class Snake(Block):
 
         self.checkEat()
 
-    def __goThroughWall(self):
+    def __goThroughWall(self, newX, newY):
         """
         Transport through the wall
         """
-        if self.x < self.game.leftBoundry:
+        if newX < self.game.leftBoundry:
             self.x = self.game.rightBoundry - self.game.size
-        elif self.y < 0:
+        elif newY < 0:
             self.y = self.game.gameHeight - self.game.size
-        elif self.x > self.game.rightBoundry - self.game.size:
+        elif newX > self.game.rightBoundry - self.game.size:
             self.x = self.game.leftBoundry
-        elif self.y > self.game.gameHeight - self.game.size:
+        elif newY > self.game.gameHeight - self.game.size:
             self.y = 0
         else:
             raise RunTimeError("Position invalid")
@@ -439,7 +464,7 @@ class Snake(Block):
         Assist the snake if it hits itself. Causes the snake to instead choose a random, safe direction to turn.
         """
         #Move snake back from bad move
-        self.__unmove()
+        #self.__unmove()
         safeDirections = self.safeDirections()
         if len(safeDirections) == 0:
             self.die()
@@ -462,7 +487,7 @@ def main():
     """
     Main entry into the program, creates a game and plays it
     """
-    game = Game(assist=True, noBoundry=True)
+    game = Game()
     game.play()
 
 
