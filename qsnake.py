@@ -82,17 +82,23 @@ class QGame(snake.Game):
         old_state = self.current_state
         self.current_state = QTable.encodeState(self.snake, self.food)
         reward = self.snake.getReward(self.current_state)
-        self.qTable.updateQValue(
-            old_state, self.current_state, action_to_take, reward)
+        self.qTable.updateQValue(old_state, self.current_state, action_to_take, reward)
         self.current_action = action_to_take
+
         if self.watchTraining:
-            self.text[3].reset(displayString=self.current_state)
-            self.text[4].reset(displayString=self.current_action)
-            self.text[5].reset(displayString=str(reward))
-            self.text[7].reset(displayString=str(self.qTable.getRow(self.current_state, self.snake).at["UP"]))
-            self.text[8].reset(displayString=str(self.qTable.getRow(self.current_state, self.snake).at["DOWN"]))
-            self.text[9].reset(displayString=str(self.qTable.getRow(self.current_state, self.snake).at["LEFT"]))
-            self.text[10].reset(displayString=str(self.qTable.getRow(self.current_state, self.snake).at["RIGHT"]))
+            resetText()
+
+    def resetText(self):
+        """
+        Sets all of the text values to the correct value
+        """
+        self.text[3].reset(displayString=self.current_state)
+        self.text[4].reset(displayString=self.current_action)
+        self.text[5].reset(displayString=str(reward))
+        self.text[7].reset(displayString=str(self.qTable.getRow(self.current_state, self.snake).at["UP"]))
+        self.text[8].reset(displayString=str(self.qTable.getRow(self.current_state, self.snake).at["DOWN"]))
+        self.text[9].reset(displayString=str(self.qTable.getRow(self.current_state, self.snake).at["LEFT"]))
+        self.text[10].reset(displayString=str(self.qTable.getRow(self.current_state, self.snake).at["RIGHT"]))
 
     def play(self):
         """
@@ -107,25 +113,21 @@ class QGame(snake.Game):
                 if event.type == pygame.KEYDOWN:
                     self.userInput(event.key)
 
+            if self.pause:
+                continue
+
             if self.training and not self.watchTraining:
                 self.step()
                 self.clock.tick()
                 continue
-
-            if self.pause:
-                continue
-
-            if timer * self.speed > self.speedOfUpdate:  # Controls the speed of the snake
+            elif timer * self.speed > self.speedOfUpdate:  # Controls the speed of the snake
                 timer = 0
                 self.step()
 
             self.drawBoard()
             timer += self.clock.tick(self.fps) / 1000
 
-
-
-    def reset(self, learning_rate=None, discount_factor=None, assist=None,
-    noBoundry=None, training=None, newQ=False):
+    def reset(self, learning_rate=None, discount_factor=None, assist=None, noBoundry=None, training=None, newQ=False):
         """
         Resets the game without resetting the Q-Table
         """
@@ -161,10 +163,14 @@ class QTable(pd.DataFrame):
     chooseAction()
 
     private Methods:
-    __etAvailableDirections()
+    __getAvailableDirections()
+    __encodeFoodPosition()
+    __encode
 
     Static Methods:
     findIndiciesOfOccurences()
+    encodeState()
+    encodeDirection()
     """
 
     def __init__(self, game, learning_rate=.1, discount_factor=.9, epsilon=0):
@@ -334,13 +340,13 @@ class QTable(pd.DataFrame):
 
                 encoded_map.set(bit_position)
 
-        QTable.__encodeFoodPosition(snake_obj, food, encoded_map)
-        QTable.__encodeDirection(snake_obj, encoded_map)
+        QTable.__encodeFoodPosition(snake_obj, food, encoded_map, bit_position+1)
+        QTable.__encodeDirection(snake_obj, encoded_map, bit_position+3)
 
         return encoded_map.tostring()[4:] #We only need 12 bits, not 16
 
     @staticmethod
-    def __encodeFoodPosition(snake, food, bitmap):
+    def __encodeFoodPosition(snake, food, bitmap, start_bit):
         """
         Encodes the position of the food into the bitmap
 
@@ -354,15 +360,15 @@ class QTable(pd.DataFrame):
         if food.x > snake.x and food.y <= snake.y:
             pass  # 00 is for top right
         elif food.x <= snake.x and food.y < snake.y:
-            bitmap.set(8)
+            bitmap.set(start_bit)
         elif food.x < snake.x and food.y >= snake.y:
-            bitmap.set(9)
+            bitmap.set(start_bit+1)
         else:
-            bitmap.set(8)
-            bitmap.set(9)
+            bitmap.set(start_bit)
+            bitmap.set(start_bit+1)
 
     @staticmethod
-    def __encodeDirection(snake, bitmap):
+    def __encodeDirection(snake, bitmap, start_bit):
         """
         Encodes the direction of the snake into the bitmap
 
@@ -375,12 +381,12 @@ class QTable(pd.DataFrame):
         if snake.getDirection().name == "UP":
             pass #00 for up
         elif snake.getDirection().name == "LEFT":
-            bitmap.set(10)
+            bitmap.set(start_bit)
         elif snake.getDirection().name == "DOWN":
-            bitmap.set(11)
+            bitmap.set(start_bit+1)
         elif snake.getDirection().name == "RIGHT":
-            bitmap.set(10)
-            bitmap.set(11)
+            bitmap.set(start_bit)
+            bitmap.set(start_bit+1)
 
 class Snake(snake.Snake):
     def __init__(self, game):
@@ -432,9 +438,7 @@ def experiment(replications, trials):
     game = QGame(training=True, watchTraining=False)
     for replication in range(0, replications):
         game.reset(newQ=True, learning_rate=.9)
-        #print(f"replication = {replication}")
         for trial in range(0, trials):
-            #print(f"trial = {trial}")
             game.play()
             game.reset()
         game.play()
@@ -443,6 +447,20 @@ def experiment(replications, trials):
     return final_scores
 
 def train(replications, trial_set, out_file_name=None):
+    """
+    Trains the snake over the number of replications and the trial set. 
+    Example replications = 10, trial_set = [1]
+    This will train the snake for 1 game, and execute a game where the
+    score is tracked. This is repeated 10 times. 
+    Can use \"graph.py\" to visualize the changes iff the output
+    is written to a file
+
+    Argument List:
+    replications - Number of times to iterate over trial_set
+    trail_set - List of number of games to train
+    out_file_name (optional) - File to store results for 
+        If not specified, the results are printed to the terminal
+    """
     records = []
     out_file = None
     processes = []
@@ -455,13 +473,6 @@ def train(replications, trial_set, out_file_name=None):
     with multiprocessing.Pool() as pool:
         results = pool.starmap(experiment, formatted_input)
 
-    #for trials in trial_set:
-    #    #with multiprocessing.Pool() as pool:
-    #    #    print(pool.starmap(experiment, [(replications, trials)]))
-
-    #    print(experiment(replications, trials))
-
-        #final_scores = experiment(replications, trials)
     for final_scores, trials in zip(results, trial_set):
         record = {
             'trials': trials,
@@ -470,20 +481,23 @@ def train(replications, trial_set, out_file_name=None):
         }
         record['final_scores'] = str(record['final_scores'])[1:-1].replace(',', '')
         records += [record]
-    print(records)
     exit()
     if out_file_name:    
         with open(out_file_name, "r+") as out_file:
-            first_line = out_file.readline().strip()
-            count = int(first_line[first_line.find('=') + 1:])
-            new_line = first_line.replace(str(count), str(count+1))
-            out_file.seek(0) #Go back to beginning of file
-            out_file.write(new_line)
+            if os.stat(out_file_name).st_size > 0
+                first_line = out_file.readline().strip()
+                count = int(first_line[first_line.find('=') + 1:])
+                new_line = first_line.replace(str(count), str(count+1))
+                out_file.seek(0) #Go back to beginning of file
+                out_file.write(new_line)
+            else: 
+                out_file.write("Count = 1")
+                count = 0
 
             out_file.seek(0, 2) #Move to end of file
             out_file.write("Training: " + str(count + 1) + '\n')
             out_file.write(json.dumps(records, indent=4) + '\n')
-    #else:
+
     for record in records:
         print(f"Trials: {trials}; Replications: {replications}")
         print(describe([int(x) for x in record['final_scores'] if x != ' ']))
