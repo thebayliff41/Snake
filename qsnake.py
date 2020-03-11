@@ -13,6 +13,7 @@ from scipy.stats import describe
 import json
 from queue import Queue
 import multiprocessing
+import os
 
 
 class QGame(snake.Game):
@@ -86,9 +87,9 @@ class QGame(snake.Game):
         self.current_action = action_to_take
 
         if self.watchTraining:
-            resetText()
+            self.resetText(reward)
 
-    def resetText(self):
+    def resetText(self, reward):
         """
         Sets all of the text values to the correct value
         """
@@ -242,7 +243,6 @@ class QTable(pd.DataFrame):
             next_action=available_directions[randint(
                 0, len(available_directions)-1)]
         else:
-        # if True:
             possible_actions=QTable.findIndiciesOfOccurences(self.getRow(
                 self.game.current_state, self.game.snake), self.getRow(self.game.current_state, self.game.snake).max())
             next_action=possible_actions[randint(0, len(possible_actions)-1)]
@@ -277,11 +277,7 @@ class QTable(pd.DataFrame):
 
         newValue=reward + self.discount_factor * nextRow.max() - value
 
-        #print(f"nextRow.max = {nextRow.max()}, value = {value}, newValue =\
-        #    {newValue}, putting_new = {value + self.learning_rate * newValue} \
-        #    discount = {self.discount_factor}, reward = {reward} \
-        #    learning = {self.learning_rate}")
-        currentRow.at[action]=value + (self.learning_rate * newValue)
+        self.loc[current_state].at[action] = value + self.learning_rate * newValue
 
     @staticmethod
     def __mapSurrounding(snake, minimum):
@@ -422,7 +418,7 @@ class Snake(snake.Snake):
         """
         self.game.done = True
         # print(f"Final score = {self.game.score}")
-        # print(self.game.qTable)
+        print(self.game.qTable)
 
 def experiment(replications, trials):
     """
@@ -484,7 +480,7 @@ def train(replications, trial_set, out_file_name=None):
     exit()
     if out_file_name:    
         with open(out_file_name, "r+") as out_file:
-            if os.stat(out_file_name).st_size > 0
+            if os.stat(out_file_name).st_size > 0:
                 first_line = out_file.readline().strip()
                 count = int(first_line[first_line.find('=') + 1:])
                 new_line = first_line.replace(str(count), str(count+1))
@@ -505,7 +501,14 @@ def train(replications, trial_set, out_file_name=None):
 def main():
     # 14 cols, 19 rows
     #train(50, [i for i in range(10, 100 + 10, 10)], "train_file.txt")
-    train(50, [1, 2, 3, 4, 5, 6], "train_file.txt")
+    #train(50, [1, 2, 3, 4, 5, 6], "train_file.txt")
+    #game = QGame(watchTraining=True)
+    #game.play()
+    game = QGame(watchTraining=False)
+    print(game.qTable)
+    row = game.qTable.getRow(game.current_state, game.snake)
+    game.qTable.updateQValue(game.current_state, "p", "LEFT", .1)
+    print(game.qTable)
     
 if __name__ == "__main__":
     main()
