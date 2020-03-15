@@ -5,6 +5,7 @@ from math import floor
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide" #Don't show the pygame startup message
 import pygame
+import sys
 
 class Game():
     """Class to create a game of snake 
@@ -337,6 +338,8 @@ class Snake(Block):
                 block.resetColor()
             self.tail[0].color = (255, 250, 205)
 
+       #### OLD CODE ####
+
         newY = self.dy + self.y
         newX = self.dx + self.x
 
@@ -344,6 +347,7 @@ class Snake(Block):
         if self.hit_wall:
             if self.game.noBoundry:
                 self.__goThroughWall(newX, newY)
+                self.checkEat(self.x, self.y)
             elif self.game.assist:
                 self.assist()
             else:
@@ -487,7 +491,13 @@ def main():
     """
     Main entry into the program, creates a game and plays it
     """
-    game = Game()
+
+    noBoundry = False
+    assist = False
+    if len(sys.argv) == 3:
+        noBoundry = bool(int(sys.argv[2]))
+        assist = bool(int(sys.argv[2]))
+    game = Game(assist=assist, noBoundry=noBoundry)
     game.play()
 
 
