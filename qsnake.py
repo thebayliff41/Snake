@@ -200,20 +200,6 @@ class QTable(pd.DataFrame):
         """
         return [index for index, value in row.items() if value == check_value]
 
-    def __addRow(self, index, snake_obj):
-        """
-        Adds a blank row to the QTable and updates the instance of self.
-
-        Arguments:
-        index - the name for the row that will be added.
-        """
-        columns = [direction.name for direction in snake.Direction if direction.name != snake_obj.getDirection().flips().name and direction.name != "NONE"]
-        newQTable=self.append(
-            pd.DataFrame(
-                [[0, 0, 0]], index=[index], columns=columns))
-        # Changing self doesn't work, must change self this way
-        self.__dict__.update(newQTable.__dict__)
-
     def getRow(self, index, snake):
         """
         Returns the row of the QTable in index. If the index doesn't exist, it is created and returned.
@@ -224,11 +210,11 @@ class QTable(pd.DataFrame):
         return - the row of the QTable related to the state that was passed.
         """
         try:
-            return self.loc[index]
+            self.loc[index]
         except KeyError:
-            self.__addRow(index, snake)
-            # Recursive call to get the location after it has been added
-            return self.getRow(index, snake)
+            self.loc[index] = [0, 0, 0, 0]
+        finally:
+            return self.loc[index]
 
     def chooseAction(self):
         """
@@ -458,9 +444,6 @@ def train(replications, trial_set, out_file_name=None):
         If not specified, the results are printed to the terminal
     """
     records = []
-    out_file = None
-    processes = []
-    process_queue = Queue()
 
     formatted_input = []
     for trial in trial_set:
