@@ -1,8 +1,11 @@
 #! /usr/bin/env python3
+
 import json
 from scipy.stats import describe
 import matplotlib.pyplot as plt
 import sys
+import argparse
+
 def undo(array):
     """
     Convert string of numebrs in psudo list format
@@ -61,13 +64,22 @@ def find_training_data(file_name, count=0):
                 out += line
     return json.loads(out)
 
+def parseArgs():
+    """
+    Parses the command line arguments. 
 
-if len(sys.argv) > 1:
-    count_to_find = int(sys.argv[1])
-else:
-    count_to_find = 0
+    Returns them as a Namespace object
+    """
+    parser = argparse.ArgumentParser(description="Graph from train_file.txt.")
+    parser.add_argument('count_to_find', metavar='C', type=int, nargs='?', help=
+        "Number of data to find in train_file.txt", default=0)
+    parser.add_argument('--with-variance', "-wv",  action="store_true")
+    parser.add_argument('-describe', '-d', action="store_true")
+    return parser.parse_args()
 
-l = find_training_data("train_file.txt", count_to_find)
+args = parseArgs()
+
+l = find_training_data("train_file.txt", args.count_to_find)
 
 final_scores = []
 trials = []
@@ -84,8 +96,15 @@ for t in final_scores:
 describes = []
 for d in formatted_scores:
     describes.append(describe(d))
+    if args.describe:
+        print(describe(d))
+
+yerr=[[d.mean + d.variance, d.mean - d.variance] for d in describes]
 
 plt.plot(trials, [d.mean for d in describes])
+if args.with_variance:
+    plt.fill_between(trials, [d.mean - d.variance for d in describes], [d.mean +
+        d.variance for d in describes], alpha=.2)
 plt.ylabel("Mean")
 plt.xlabel("Number of Trials")
 plt.figtext(.1, .9, f"Replications: {replications}")

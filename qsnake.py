@@ -126,6 +126,7 @@ class QGame(snake.Game):
                 self.step()
 
             self.drawBoard()
+            pygame.display.flip()  # update display
             timer += self.clock.tick(self.fps) / 1000
 
     def reset(self, learning_rate=None, discount_factor=None, assist=None, noBoundry=None, training=None, newQ=False):
@@ -403,8 +404,9 @@ class Snake(snake.Snake):
         Print the QTable upon death
         """
         self.game.done = True
-        # print(f"Final score = {self.game.score}")
-        print(self.game.qTable)
+        if self.game.watchTraining:
+            print(f"Final score = {self.game.score}")
+            print(self.game.qTable)
 
 def experiment(replications, trials):
     """
@@ -449,7 +451,7 @@ def train(replications, trial_set, out_file_name=None):
     for trial in trial_set:
         formatted_input.append((replications, trial))
 
-    with multiprocessing.Pool() as pool:
+    with multiprocessing.Pool(processes=8) as pool:
         results = pool.starmap(experiment, formatted_input)
 
     for final_scores, trials in zip(results, trial_set):
@@ -460,7 +462,6 @@ def train(replications, trial_set, out_file_name=None):
         }
         record['final_scores'] = str(record['final_scores'])[1:-1].replace(',', '')
         records += [record]
-    exit()
     if out_file_name:    
         with open(out_file_name, "r+") as out_file:
             if os.stat(out_file_name).st_size > 0:
@@ -483,15 +484,10 @@ def train(replications, trial_set, out_file_name=None):
 
 def main():
     # 14 cols, 19 rows
-    #train(50, [i for i in range(10, 100 + 10, 10)], "train_file.txt")
+    train(100, [i for i in range(10, 200 + 10, 10)], "train_file.txt")
     #train(50, [1, 2, 3, 4, 5, 6], "train_file.txt")
     #game = QGame(watchTraining=True)
     #game.play()
-    game = QGame(watchTraining=False)
-    print(game.qTable)
-    row = game.qTable.getRow(game.current_state, game.snake)
-    game.qTable.updateQValue(game.current_state, "p", "LEFT", .1)
-    print(game.qTable)
     
 if __name__ == "__main__":
     main()

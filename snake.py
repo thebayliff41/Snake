@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 from enum import Enum
-from random import randint
+from random import randint, choice
 from math import floor
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide" #Don't show the pygame startup message
@@ -114,6 +114,7 @@ class Game():
                 moved = False
 
             self.drawBoard()
+            pygame.display.flip()  # update display
             timer += self.clock.tick(self.fps) / 1000
   
     def drawBoard(self):
@@ -134,7 +135,6 @@ class Game():
 
         for text in self.text:
             text.draw()
-        pygame.display.flip()  # update display
 
 
 class Direction(Enum):
@@ -157,6 +157,9 @@ class Direction(Enum):
 
     def flips(self):
         return Direction([-self.value[0], -self.value[1]])
+
+    def __invert__(self):
+        return Direction(list(map(lambda x: -x, self.value)))
 
 
 class Block(pygame.Rect):
@@ -331,14 +334,15 @@ class Snake(Block):
         element) and putting a new Block where the head used to be. 
         """
 
+        self.hit_self = False
+        self.hit_wall = False
+
         if self.tail:
             self.tail = self.tail[1:]
             self.tail.append(Block(self.game.size, self.x, self.y))
             for block in self.tail[1:]:
                 block.resetColor()
             self.tail[0].color = (255, 250, 205)
-
-       #### OLD CODE ####
 
         newY = self.dy + self.y
         newX = self.dx + self.x
@@ -367,13 +371,10 @@ class Snake(Block):
         self.y = newY
         self.x = newX
 
-
     def hitWall(self, newX, newY):
         """Check if the snake hit the wall"""
         if newX < self.game.leftBoundry or newY < 0 or newX > self.game.rightBoundry - self.game.size or newY > self.game.gameHeight - self.game.size:  # hit edge of screen
             self.hit_wall = True
-        else:
-            self.hit_wall = False
 
     def hitSelf(self, newX, newY):
         """Check if the snake head hit part of it's tail"""
@@ -382,26 +383,28 @@ class Snake(Block):
             if newBlock.colliderect(block):
                 self.hit_self = True
                 return
-        self.hit_self = False
 
     def die(self):
         """Kill the snake, end the game"""
         self.game.done = True
         print("You have died! Game Over")
         print(f"Final score = {self.game.score}")
+        exit()
 
-    def safeDirections(self):
+    def safeDirections(self, walls, tail):
         """
         Returns a list of the safe directions that the snake can go at the given spot. 
         """
         safe = [Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT]
         safe.remove(Direction(self.getDirection())) # remove the unsafe direction
-        if self.game.assist:
+
+        if self.game.assist or tail:
             self.checkCollideWithTail(safe)
 
-        if not self.game.noBoundry: #Check walls if they can kill you
+        if not self.game.noBoundry or walls: #Check walls if they can kill you
             self.checkCollideWithWall(safe)
 
+        print(safe)
         return safe
 
     def checkCollideWithWall(self, directions):
@@ -412,8 +415,13 @@ class Snake(Block):
         list - a list of directions
         """
         for item in directions:
-            if self.x + item.value[0] < self.game.leftBoundry or self.y + item.value[1] < 0 or self.x + item.value[0] > self.game.rightBoundry - self.game.size or self.y + item.value[1] > self.game.gameHeight - self.game.size:
+            if (self.x + item.value[0] * self.width < self.game.leftBoundry or
+                self.y + item.value[1] * self.width == 0 or self.x + item.value[0] >
+                self.game.rightBoundry - self.game.size or self.y + item.value[1] >
+                self.game.gameHeight - self.game.size
+                ):
                 directions.remove(item)
+                break
 
     def checkCollideWithTail(self, directions):
         """
@@ -422,30 +430,15 @@ class Snake(Block):
         Keyword Arguments: 
         list - a list of the current safe directions, will update the list in place
         """
+        dx, dy = map(lambda x: x * self.width, self.getDirection().value)
+        cur_block = Block(self.width, self.x + dx, self.y + dy)
         for block in self.tail:
-            if block == self.tail[1]:
-                continue
             for item in directions:
-                if Block(self.game.size, self.x + item.value[0] * self.game.size, self.y + item.value[1] * self.game.size).colliderect(block):
+                dx, dy = map(lambda x: x * self.width, item.value)
+                if Block(self.game.size, cur_block.x + dx,
+                    cur_block.y + dy).colliderect(block):
                     directions.remove(item)
-
-    def __unmove(self):
-        """
-        Undo the last move
-        """
-        self.x -= self.dx
-        self.y -= self.dy
-
-        self.hitWall()
-        if self.hit_wall:
-            if self.game.noBoundry:
-                self.__goThroughWall()
-            elif self.game.assist:
-                self.assist()
-            else:
-                self.die()
-
-        self.checkEat()
+                    break
 
     def __goThroughWall(self, newX, newY):
         """
@@ -463,18 +456,16 @@ class Snake(Block):
             raise RunTimeError("Position invalid")
             
 
-    def assist(self):
+    def assist(self, walls = False, tail = False):
         """
         Assist the snake if it hits itself. Causes the snake to instead choose a random, safe direction to turn.
         """
-        #Move snake back from bad move
-        #self.__unmove()
-        safeDirections = self.safeDirections()
-        if len(safeDirections) == 0:
-            self.die()
-        else:
-            self.changeDirection(safeDirections[randint(0, len(safeDirections)-1)], avoidFlip=False)
+        safeDirections = self.safeDirections(walls, tail)
+        if safeDirections:
+            self.changeDirection(choice(safeDirections), avoidFlip=False)
             self.move()
+        else:
+            self.die()
 
     def distanceToFood(self):
         """
