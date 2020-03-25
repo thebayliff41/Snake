@@ -33,7 +33,10 @@ class QGame(snake.Game):
         self.pause = False
         self.training = training
         self.watchTraining = watchTraining if training else True
-        if watchTraining:
+        self.initText()
+
+    def initText(self):
+        if self.watchTraining:
             self.text.append(snake.DisplayText(self.screen, (10, 30), "Learning Rate: ", self.font, str(.1)))
             self.text.append(snake.DisplayText(self.screen, (10, 50), "Discount Factor: ", self.font, str(.9)))
             self.text.append(snake.DisplayText(self.screen, (10, 70), "Current Encoded State: ", self.font, self.current_state))
@@ -277,8 +280,23 @@ class QTable(pd.DataFrame):
                        for (block, place) in itertools.zip_longest(snake.tail[1:], tail_placeholder)
                        if (x, y) != (snake.x, snake.y)]
 
-    @staticmethod
-    def encodeState(snake_obj, food):
+    @classmethod
+    def __encodeSurrounding(cls, bmap, minimum_value, snake_obj, bit_start = 0):
+        surrounding = cls.__mapSurrounding(snake_obj, minimum_value)
+        encoded_map = bmap
+        # Checks each block in the surrounding and checks if it is near a wall, or near a piece of the tail
+        bit_position=bit_start
+        for (index, (x, y, block)) in enumerate(surrounding):
+            if index % minimum_value == 0 and index != 0:  # Don't increment immediately
+                bit_position += 1
+            if (x < snake_obj.game.leftBoundry or y < 0 or x == snake_obj.game.rightBoundry or y == constant.WINDOW_HEIGHT
+                or (block != None and block.colliderect(snake.Block(constant.BLOCK_SIZE, x, y)))
+                and not encoded_map.test(bit_position)):
+
+                encoded_map.set(bit_position)
+
+    @classmethod
+    def encodeState(cls, snake_obj, food):
         """
         Encodes a state into the following format:
 
@@ -307,22 +325,24 @@ class QTable(pd.DataFrame):
         # the 8 blocks we are attaching every piece of the tail. This will give 8 * len(tail) values to compare.
         minimum_value = 1 if len(snake_obj.tail) == 0 else len(snake_obj.tail) #To fix mod by 0 error
 
-        surrounding = QTable.__mapSurrounding(snake_obj, minimum_value)
+        #surrounding = QTable.__mapSurrounding(snake_obj, minimum_value)
 
         # 2 bits for direction, 2 bits for quadrant, one bit each for 8 square locations around snake
         encoded_map=bitmap.BitMap(12)
 
         # Checks each block in the surrounding and checks if it is near a wall, or near a piece of the tail
-        bit_position=0
-        for (index, (x, y, block)) in enumerate(surrounding):
-            if index % minimum_value == 0 and index != 0:  # Don't increment immediately
-                bit_position += 1
-            if (x < snake_obj.game.leftBoundry or y < 0 or x == snake_obj.game.rightBoundry or y == constant.WINDOW_HEIGHT
-                or (block != None and block.colliderect(snake.Block(constant.BLOCK_SIZE, x, y)))
-                and not encoded_map.test(bit_position)):
+        #bit_position=0
+        #for (index, (x, y, block)) in enumerate(surrounding):
+        #    if index % minimum_value == 0 and index != 0:  # Don't increment immediately
+        #        bit_position += 1
+        #    if (x < snake_obj.game.leftBoundry or y < 0 or x == snake_obj.game.rightBoundry or y == constant.WINDOW_HEIGHT
+        #        or (block != None and block.colliderect(snake.Block(constant.BLOCK_SIZE, x, y)))
+        #        and not encoded_map.test(bit_position)):
 
-                encoded_map.set(bit_position)
+        #        encoded_map.set(bit_position)
+        cls.__encodeSurrounding(encoded_map, minimum_value, snake_obj)
 
+        bit_position = 7
         QTable.__encodeFoodPosition(snake_obj, food, encoded_map, bit_position+1)
         QTable.__encodeDirection(snake_obj, encoded_map, bit_position+3)
 

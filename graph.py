@@ -3,6 +3,9 @@
 import json
 from scipy.stats import describe
 import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from scipy.optimize import curve_fit
+import numpy as np
 import sys
 import argparse
 
@@ -77,36 +80,52 @@ def parseArgs():
     parser.add_argument('-describe', '-d', action="store_true")
     return parser.parse_args()
 
-args = parseArgs()
+def main():
+    args = parseArgs()
 
-l = find_training_data("train_file.txt", args.count_to_find)
+    l = find_training_data("train_file.txt", args.count_to_find)
 
-final_scores = []
-trials = []
-replications = l[0]['replications']
-for d in l:
-    final_scores.append(d['final_scores'])
-    trials.append(d['trials'])
+    final_scores = []
+    trials = []
+    replications = l[0]['replications']
+    for d in l:
+        final_scores.append(d['final_scores'])
+        trials.append(d['trials'])
 
-formatted_scores = []
+    formatted_scores = []
 
-for t in final_scores:
-    formatted_scores.append(undo(t))
+    for t in final_scores:
+        formatted_scores.append(undo(t))
 
-describes = []
-for d in formatted_scores:
-    describes.append(describe(d))
-    if args.describe:
-        print(describe(d))
+    describes = []
+    for d in formatted_scores:
+        describes.append(describe(d))
+        if args.describe:
+            print(describe(d))
 
-yerr=[[d.mean + d.variance, d.mean - d.variance] for d in describes]
+    model = LinearRegression()
+    x = np.asarray(trials).reshape(-1, 1)
+    y = np.asarray([d.mean for d in describes]).reshape(-1, 1)
 
-plt.plot(trials, [d.mean for d in describes])
-if args.with_variance:
-    plt.fill_between(trials, [d.mean - d.variance for d in describes], [d.mean +
-        d.variance for d in describes], alpha=.2)
-plt.ylabel("Mean")
-plt.xlabel("Number of Trials")
-plt.figtext(.1, .9, f"Replications: {replications}")
-plt.title("Average Snake length vs trials")
-plt.show()
+    model.fit(x, y)
+
+    y_new = model.predict(x)
+    ax = plt.axes()
+
+    yerr = np.array([[d.variance if d.mean - d.variance >= 0 else d.mean 
+    for d in describes], [d.variance for d in describes]])
+    plt.errorbar(x, y, yerr=yerr)
+    plt.scatter(x, y)
+    plt.plot(x, y_new, color='red', label="linear-fit")
+    #plt.plot(trials, [d.mean for d in describes])
+    if args.with_variance:
+        plt.fill_between(trials, [d.mean - d.variance if d.mean - d.variance >=
+        0 else 0 for d in describes], [d.mean + d.variance for d in describes], alpha=.2)
+    plt.ylabel("Mean")
+    plt.xlabel("Number of Trials")
+    plt.figtext(.1, .9, f"Replications: {replications}")
+    plt.title("Average Snake length vs trials")
+    plt.show()
+
+if __name__ == "__main__":
+    main()

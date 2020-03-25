@@ -1,15 +1,18 @@
 #! /usr/bin/env python3
 
 import snake
+import qsnake
 import random
 import pygame
 import bitmap
 
 class Game(snake.Game):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, size=40, fps=60, windowHeight=600, windowWidth=960, gameHeight=600, gameWidth=800, speed=10, noBoundry = False, assist = False, screen=True):
+        super().__init__(size, fps, windowHeight, windowWidth, gameHeight,
+        gameWidth, speed, noBoundry, assist, screen)
         self.redirection_blocks = self.__createBlocks()
         self.snake = Snake(self)
+        self.food = Food(self)
 
     def __sortBlocksBottomL(self, blocks):
         blocks.sort(key=lambda block: (block.x, -block.y))
@@ -398,7 +401,7 @@ class Game(snake.Game):
         for block in self.redirection_blocks:
             pygame.draw.rect(self.screen, block.color, block)
             
-class Snake(snake.Snake):
+class Snake(qsnake.Snake):
     def __init__(self, game):
         super().__init__(game)
         self.hit_redirect = False
@@ -466,6 +469,7 @@ class Snake(snake.Snake):
         for block in self.game.redirection_blocks:
             if block.colliderect(newBlock):
                 self.hit_redirect = True
+                break
         
 class Food(snake.Food):
     def __init__(self, game):
@@ -473,7 +477,7 @@ class Food(snake.Food):
 
     def isSafe(self):
         return (super().isSafe() and snake.Block(self.width, self.x, self.y) not
-            in game.redirection_blocks)
+            in self.game.redirection_blocks)
         
 def main():
     game = Game()
