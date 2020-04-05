@@ -7,14 +7,20 @@ import pygame
 import bitmap
 
 class Game(snake.Game):
-    def __init__(self, size=40, fps=60, windowHeight=600, windowWidth=960, gameHeight=600, gameWidth=800, speed=10, noBoundry = False, assist = False, screen=True):
+    def __init__(self, size=40, fps=60, windowHeight=600, windowWidth=960,
+    gameHeight=600, gameWidth=800, speed=10, noBoundry = False, assist = False,
+    screen=True, watchTraining = False):
         super().__init__(size, fps, windowHeight, windowWidth, gameHeight,
         gameWidth, speed, noBoundry, assist, screen)
         self.redirection_blocks = self.__createBlocks()
         self.snake = Snake(self)
         self.food = Food(self)
+        self.watchTraining = watchTraining
 
     def __sortBlocksBottomL(self, blocks):
+        """
+        Sorts blocks based on the lowest left block first
+        """
         blocks.sort(key=lambda block: (block.x, -block.y))
 
     def __findGaps(self, blocks, current_index = 0, current_gap = 0):
@@ -34,14 +40,19 @@ class Game(snake.Game):
                 if start_block == end_block:
                     continue
 
-                seen += [start_block]
-
+                    seen += [start_block]
                 if start_block.x == end_block.x:
                     gaps += start_block.y - end_block.y // self.size - 1
                 elif start_block.y == end_block.y:
                     gaps += start_block.x - end_block.x // self.size - 1
 
     def __touchingOtherBlock(self, block, blocks):
+        """
+        Retruns a list of blocks that are touching the given block
+
+        Argument List:
+        blocks - List of blocks on the board
+        """
         directions = [snake.Direction.UP, snake.Direction.DOWN,
             snake.Direction.LEFT, snake.Direction.RIGHT]
 
@@ -55,30 +66,48 @@ class Game(snake.Game):
         return blocks_touching
 
     def __gridDistanceBetweenBlocks(self, start, end):
+        """
+        Retruns the number of grid squares between two blocks. 
+        Note: Distance is always >= 1
+        """
         if start == end:
            raise ValueError("The blocks are the same!") 
 
         return abs(start.x - end.x) + abs(start.y - end.y) / self.size
 
     def __shareAxis(self, start, end):
+        """
+        Determines if two blocks share an axis on the board
+        """
         if start == end:
            raise ValueError("The blocks are the same!") 
 
-        return start.x == end.x or start.y == end.y
+        return self.__shareYAxis(start, end) or self.__shareXAxis(start, end)
 
     def __shareXAxis(self, start, end):
+        """
+        Determines if two blocks share the same x-axis on the board
+        """
         if start == end:
            raise ValueError("The blocks are the same!") 
 
         return start.x == end.x
 
     def __shareYAxis(self, start, end):
+        """
+        Determines if two blocks share the same y-axis on the board"
+        """
         if start == end:
            raise ValueError("The blocks are the same!") 
 
         return start.y == end.y
 
     def __closest2Walls(self, block):
+        """
+        Returns the two closest walls to the given point on the grid
+        """
+
+        #Add error checking
         walls = [snake.Block(block.width, block.x, 0), snake.Block(block.width,
             self.leftBoundry, block.x), snake.Block(block.width, block.x,
             self.gameHeight), snake.Block(block.width, block.rightBoundry, block.y)]
@@ -89,8 +118,6 @@ class Game(snake.Game):
 
     def __searchEdge(self, origin, blocks, last_direction = None, block = None,
         distance_travelled = 0):
-        #print("new depth")
-        #print(origin, blocks, last_direction, block, distance_travelled)
 
         if block == origin: 
             return True
@@ -108,51 +135,26 @@ class Game(snake.Game):
             directions.remove(~last_direction)
 
         for direction in directions:
-            #print("new direction")
             dx, dy = map(lambda x: x * block.width, direction.value)
             newBlock = snake.Block(block.width, block.x + dx, block.y + dy)
 
-            #print(direction, dx, dy, newBlock)
             if newBlock in blocks:
                 further=self.__searchEdge(origin, blocks, direction, newBlock, distance_travelled)
             else:
                 further = self.__searchEdge(origin, blocks, direction, newBlock, distance_travelled + 1)
-            #print(further)
 
         return False
 
     def __isEdge(self, blocks, block):
-        #print("isedge", blocks, block)
-        #print("\n\n\nNEW CHECK")
         return self.__searchEdge(block, blocks)
-        #count = 0
-        #closest_walls = self.__closest2Walls(block)
-        #for end_block in blocks + closest_walls:
-        #    if block == end_block:
-        #        continue
-
-        #    if self.__shareAxis(block, end_block):
-        #        #ALWAYS >= 1
-        #encoded_map = self.__mapBlockSurrounding((block.x, block.y), blocks)
-        #if (encoded_map[1] and encoded_map[3] or
-        #    encoded_map[6] and encoded_map[3] or
-        #    encoded_map[1] and encoded_map[4] or
-        #    encoded_map[6] and encoded_map[4]):
-
-        #    for end_block in blocks:
-        #        if end_block == block:
-        #            continue
-        #        if self.__shareAxis(block, end_block):
-        #            return True
-        #else:
-        #    return False
-        #distance = self.__gridDistanceBetweenBlocks(block, end_block)
-                #if distance > 1: #Touching
-                #    count += 1
-
-        #return #count == 2
 
     def __findEdges(self, blocks):
+        """
+        Finds the edges of shapes in the board
+
+        Argument List:
+        blocks: All of the blocks on the board
+        """
         edges = []
         for block in blocks:
             if self.__isEdge(blocks, block):
@@ -256,15 +258,12 @@ class Game(snake.Game):
 
         #Make list of all surrounding blocks in board
         bx, by = block
-        #print(bx, by)
         surrounding = [(sur_x, sur_y) for sur_x in
             range(bx - self.size, bx + self.size * 2, self.size) 
             for sur_y in range(by - self.size, by + self.size * 2, self.size)
             if sur_x != bx or sur_y != by]
 
         #Encode the surroundings into the bitmap
-        #print("surrounding")
-        #print(surrounding)
         for index, (x, y) in enumerate(surrounding):
             if (snake.Block(self.size, x, y) in blocks or x <= self.leftBoundry
                 or y <= 0 or x >= self.rightBoundry or y >= self.gameHeight
@@ -308,14 +307,12 @@ class Game(snake.Game):
             encoded_map = self.__mapBlockSurrounding(surrounding, blocks)
             #Check for conflict
             if encoded_map.count() >= 3: #If it's less, theres no possibility of conflict
-                print(encoded_map)
                 #Check for -_- shape (impossible to escape)
                 if ((encoded_map[3] and encoded_map[4]
                     and (encoded_map[1] or encoded_map[6]))
                     or ((encoded_map[1] and encoded_map[6]) 
                     and (encoded_map[3] or encoded_map[4]))
                     ):
-                    print(block)
                     return False #Not valid, conflict exists
 
         #Add the corners so we can find the edges
@@ -323,25 +320,25 @@ class Game(snake.Game):
         #   ### <- This   ##
         #   #  #         #  #
         #              ->   #
-        #                 ##
+        #   #            # ##
+        #                   #
+        #  # #
+        #    
         #Thought: if we have 3 corners we can find the 4th
         corner_blocks = self.__addCorners(blocks) 
         blocks_with_corners = blocks + corner_blocks
 
         #if len(blocks) >= 3:
-        if False:
+        if False: #This isn't working 
             edges = self.__findEdges(blocks_with_corners)
 
             if len(edges) == 3:
                 x_values = [x.x for x in edges]
                 y_values = [x.y for x in edges]
 
-                #print("edges", edges)
-                #print("x_values", x_values, "y_values", y_values)
 
                 missing_x = [m for m in x_values if x_values.count(m) == 1]
                 missing_y = [m for m in y_values if y_values.count(m) == 1]
-                #print("missing_x", missing_x, "missing_y", missing_y)
 
                 edges += [snake.Block(self.size, missing_x, missing_y)]
 
@@ -382,10 +379,8 @@ class Game(snake.Game):
                         color=(220, 220, 220)))
 
                 if self.__isSafe(block_coordinates):
-                    print("Good placement")
                     safe = True
                 else:
-                    print("bad placement")
                     block_coordinates.pop()
 
         return block_coordinates
@@ -476,6 +471,11 @@ class Food(snake.Food):
         super().__init__(game)
 
     def isSafe(self):
+        """
+        Determine if the food is in a reachable location
+
+        OVERRIDE
+        """
         return (super().isSafe() and snake.Block(self.width, self.x, self.y) not
             in self.game.redirection_blocks)
         
