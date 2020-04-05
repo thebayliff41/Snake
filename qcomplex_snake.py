@@ -12,7 +12,6 @@ class QGame(complex_snake.Game):
     def __init__(self, training=False, watchTraining=False):
         global redirection_blocks
         super().__init__(windowWidth=1280, noBoundry=False, assist=False, screen=watchTraining)
-        print(self.redirection_blocks)
         redirection_blocks = self.redirection_blocks
         self.snake = complex_snake.Snake(self)
         self.current_state = QTable.encodeState(self.snake, self.food)
@@ -52,6 +51,7 @@ class QGame(complex_snake.Game):
         elif key == pygame.K_s and self.pause and self.watchTraining:
             self.step()
             self.drawBoard()
+            pygame.display.flip()
         elif key == pygame.K_d: 
             if not self.watchTraining:
                 pygame.display.init()
@@ -125,10 +125,10 @@ class QGame(complex_snake.Game):
         """
         Resets the game without resetting the Q-Table
         """
-        self.snake = Snake(self)
+        self.snake = complex_snake.Snake(self)
         self.score = 0
         self.current_action = self.qTable.chooseAction()
-        self.food = snake.Food(self)
+        self.food = complex_snake.Food(self)
         self.done = False
         self.qTable = QTable(self) if newQ else self.qTable
         if hasattr(self, "scoreText"):
@@ -164,9 +164,44 @@ class QTable(qsnake.QTable):
 
                 encoded_map.set(bit_position)
 
+class Snake(complex_snake.Snake):
+    def __init__(self, game):
+        super().__init__(game)
+        self.last_distance = self.distanceToFood()
+
+    def getReward(self, state):
+        """
+        Returns the reward of the state
+
+        Arguments:
+        state - the state that the snke is in
+        """
+        new_distance = self.distanceToFood()
+        if len(self.tail) > self.last_length:  # An apple was eaten
+            self.last_length=len(self.tail)
+            reward = 1
+        elif self.hit_wall or self.hit_self or self.hit_redirect:
+            reward = -100
+        elif new_distance < self.last_distance:
+            reward = .1
+        else:
+            reward = -.2
+
+        self.last_distance = new_distance
+
+        return reward
+        
+
 def main():
-    game = QGame(watchTraining = True)
-    game.play()
+    #game = QGame(training = True, watchTraining = True)
+    #for i in range(10):
+    #    game.play()
+    #    game.reset()
+
+    #game.play()
+        
+    #qsnake.train(10, QGame, [i for i in range(10, 20, 10)], "complex_train_file.txt")
+    qsnake.train(100, QGame, [i for i in range(10, 200 + 10, 10)], "complex_train_file.txt")
 
 if __name__ == "__main__":
     main()
