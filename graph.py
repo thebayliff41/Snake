@@ -1,11 +1,14 @@
 #! /usr/bin/env python3
 
 import json
-from scipy.stats import describe
+from scipy.stats import describe, sem, t
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import normalize
+from sklearn.metrics import r2_score
 from scipy.optimize import curve_fit
 import numpy as np
+import math
 import sys
 import argparse
 
@@ -47,7 +50,6 @@ def find_training_data(file_name, count=0):
         first_line = f.readline().strip()
         count_in_file = int(first_line[first_line.find('=') + 1:])
         count = count_in_file if count == 0 else count
-
         rest_of_file = f.readlines()
         start = -1
         end = -1
@@ -74,21 +76,111 @@ def parseArgs():
     Returns them as a Namespace object
     """
     parser = argparse.ArgumentParser(description="Graph from train_file.txt.")
-    parser.add_argument('count_to_find', metavar='C', type=int, nargs='?', help=
-        "Number of data to find in train_file.txt", default=0)
+    parser.add_argument('count_to_find', metavar='C', type=int, nargs='?', 
+        help= "Number of data to find in train_file.txt", default=0)
     parser.add_argument('--with-variance', "-wv",  action="store_true")
     parser.add_argument('-describe', '-d', action="store_true")
+    parser.add_argument('-suppress', '-s', action="store_true")
+    parser.add_argument('-linearize', '-l', action="store_true")
+    parser.add_argument('-confidence-interval', '-ci', action="store_true")
+    parser.add_argument('-cutoff', '-co', type=int, default=0)
+    parser.add_argument('-complex', '-cp', action="store_true")
     return parser.parse_args()
 
-def main():
-    args = parseArgs()
+def mean_confidence_interval(data, confidence=0.95):
+    """
+    Returns the confidence interval for the given data.
 
-    l = find_training_data("train_file.txt", args.count_to_find)
+    Argument list:
+    :param data: The data to take the CI from
+    :param confidence: the amount of confidence we want to have from the data
+    """
+    if type(data) != type(np.array([0])):
+        raise ValueError(
+        f"The given array has type {type(data)} but should be of type {type(np.array([0]))}")
+
+    number_of_elements = len(data)
+    average, standard_error = np.mean(data), sem(data)
+    interval = standard_error * t.ppf((1 + confidence) / 2., number_of_elements-1)
+    return average, average - interval, average + interval
+
+def makeAllGtZero(array):
+    """
+    Takes an array and modifies in place. Adds the lowest number to all members
+    of the array. 
+
+    :param array: numpy array containing data to edit
+    """
+    if not isinstance(array, np.ndarray):
+        raise ValueError(
+        f"The given array has type {type(data)} but should be of type {type(np.array([0]))}")
+
+    lowest = array.min() 
+    if lowest < 0:
+        with np.nditer(array, op_flags=['readwrite']) as it:
+            for value in it:
+                value[...] = abs(lowest) + value
+
+    else:
+        return
+
+def normalize(array):
+    """
+    Normalizes the data passeed into through the array. Array is changed in
+    place.
+
+    Keyword arguments:
+    array - numpy array containing data
+    """
+    if not isinstance(array, np.ndarray):
+        raise ValueError(
+        f"The given array has type {type(data)} but should be of type {type(np.array([0]))}")
+
+    array_max = np.max(array)
+    with np.nditer(array, op_flags=['readwrite']) as it:
+        for value in it:
+            value[...] = value/array_max
+
+def parseData(data_list, scores, confidence_interval = False, verbose = False):
+    """
+    Places the confidence interval data into the given list
+
+    Keyword arguments:
+    data_list - empty list
+    """
+    if not isinstance(data_list, list) or data_list: 
+        raise ValueError(
+        f"The given data has type {type(data_list)} but should be of type list")
+
+    for data in scores:
+        _, low, high = mean_confidence_interval(np.array(data))
+
+        if confidence_interval:
+            #Don't modify iterable while iterating
+            copy_data = data
+            for num in copy_data:
+                if num < low or num > high:
+                    data.remove(num)
+
+        data_list.append(describe(data))
+        if verbose:
+            print(describe(data))
+
+def main():
+    """Driver"""
+
+    args = parseArgs()
+    if args.complex:
+        file_name = "complex_train_file.txt"
+    else:
+        file_name = "train_file.txt"
+
+    data = find_training_data(file_name, args.count_to_find)
 
     final_scores = []
     trials = []
-    replications = l[0]['replications']
-    for d in l:
+    replications = data[0]['replications']
+    for d in data:
         final_scores.append(d['final_scores'])
         trials.append(d['trials'])
 
@@ -98,34 +190,48 @@ def main():
         formatted_scores.append(undo(t))
 
     describes = []
-    for d in formatted_scores:
-        describes.append(describe(d))
-        if args.describe:
-            print(describe(d))
+    parseData(describes, formatted_scores, args.confidence_interval, args.describe)
 
     model = LinearRegression()
+
     x = np.asarray(trials).reshape(-1, 1)
     y = np.asarray([d.mean for d in describes]).reshape(-1, 1)
+    model_y = y
 
-    model.fit(x, y)
-
-    y_new = model.predict(x)
     ax = plt.axes()
 
-    yerr = np.array([[d.variance if d.mean - d.variance >= 0 else d.mean 
-    for d in describes], [d.variance for d in describes]])
-    plt.errorbar(x, y, yerr=yerr)
+    if args.linearize:
+        y_lin = np.exp(y) #Linearize y
+        y_norm = np.copy(y_lin)
+
+        y_norm = np.log(y_norm)
+
+        y_lin 
+        model_y = y_lin
+
+        #Supa's way
+        b = np.mean(x * y) / np.mean(x * x)
+        z = b * x
+
+    model.fit(x, model_y)
     plt.scatter(x, y)
+
+    y_new = model.predict(x)
+
+    y_new = np.log(y_new) #was indented
+
     plt.plot(x, y_new, color='red', label="linear-fit")
-    #plt.plot(trials, [d.mean for d in describes])
-    if args.with_variance:
-        plt.fill_between(trials, [d.mean - d.variance if d.mean - d.variance >=
-        0 else 0 for d in describes], [d.mean + d.variance for d in describes], alpha=.2)
+    #plt.plot(x, np.log(z), color='red', label="linear-fit")
+    #print(r2_score(y_new, logy))
+    print(f"y = {model.coef_}x + {model.intercept_}")
+
     plt.ylabel("Mean")
     plt.xlabel("Number of Trials")
     plt.figtext(.1, .9, f"Replications: {replications}")
     plt.title("Average Snake length vs trials")
-    plt.show()
+
+    if not args.suppress:
+        plt.show()
 
 if __name__ == "__main__":
     main()
