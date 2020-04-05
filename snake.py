@@ -404,7 +404,6 @@ class Snake(Block):
         if not self.game.noBoundry or walls: #Check walls if they can kill you
             self.checkCollideWithWall(safe)
 
-        print(safe)
         return safe
 
     def checkCollideWithWall(self, directions):
