@@ -428,21 +428,23 @@ class Snake(snake.Snake):
             print(f"Final score = {self.game.score}")
             print(self.game.qTable)
 
-def experiment(replications, trials):
+def experiment(game_type, replications, trials):
     """
     Train the snake over different trial counts; each trial count is replicated multiple times.
 
     Argument List:
+    game_type - The type of the game object to be called
     replications - Number of replications
     trials - Number of trials per replication
 
     returns list of scores; len(list) == replications
     """
     final_scores = []
-    game = QGame(training=True, watchTraining=False)
+    game = game_type(training=True, watchTraining=False)
     for replication in range(0, replications):
         game.reset(newQ=True, learning_rate=.9)
         for trial in range(0, trials):
+            print(trial)
             game.play()
             game.reset()
         game.play()
@@ -450,7 +452,7 @@ def experiment(replications, trials):
 
     return final_scores
 
-def train(replications, trial_set, out_file_name=None):
+def train(replications, game_type, trial_set, out_file_name=None):
     """
     Trains the snake over the number of replications and the trial set. 
     Example replications = 10, trial_set = [1]
@@ -461,6 +463,7 @@ def train(replications, trial_set, out_file_name=None):
 
     Argument List:
     replications - Number of times to iterate over trial_set
+    game_type - the type of the game object.
     trail_set - List of number of games to train
     out_file_name (optional) - File to store results for 
         If not specified, the results are printed to the terminal
@@ -469,7 +472,7 @@ def train(replications, trial_set, out_file_name=None):
 
     formatted_input = []
     for trial in trial_set:
-        formatted_input.append((replications, trial))
+        formatted_input.append((game_type, replications, trial))
 
     with multiprocessing.Pool(processes=8) as pool:
         results = pool.starmap(experiment, formatted_input)
@@ -483,16 +486,22 @@ def train(replications, trial_set, out_file_name=None):
         record['final_scores'] = str(record['final_scores'])[1:-1].replace(',', '')
         records += [record]
     if out_file_name:    
-        with open(out_file_name, "r+") as out_file:
-            if os.stat(out_file_name).st_size > 0:
-                first_line = out_file.readline().strip()
-                count = int(first_line[first_line.find('=') + 1:])
-                new_line = first_line.replace(str(count), str(count+1))
-                out_file.seek(0) #Go back to beginning of file
-                out_file.write(new_line)
-            else: 
-                out_file.write("Count = 1")
+        if not os.path.exists(out_file_name):
+            with open(out_file_name, "a") as out_file:
+                out_file.write("Count = 1\n")
                 count = 0
+        else:
+            count = -1
+
+        with open(out_file_name, "r+") as out_file:
+            first_line = out_file.readline().strip()
+
+            if count == -1:
+                count = int(first_line[first_line.find('=') + 1:])
+
+            new_line = first_line.replace(str(count), str(count+1))
+            out_file.seek(0) #Go back to beginning of file
+            out_file.write(new_line)
 
             out_file.seek(0, 2) #Move to end of file
             out_file.write("Training: " + str(count + 1) + '\n')
@@ -504,7 +513,7 @@ def train(replications, trial_set, out_file_name=None):
 
 def main():
     # 14 cols, 19 rows
-    train(100, [i for i in range(10, 200 + 10, 10)], "train_file.txt")
+    train(100, QGame, [i for i in range(10, 200 + 10, 10)], "train_file.txt")
     #train(50, [1, 2, 3, 4, 5, 6], "train_file.txt")
     #game = QGame(watchTraining=True)
     #game.play()
