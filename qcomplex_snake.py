@@ -201,7 +201,7 @@ def main():
     #game.play()
         
     #qsnake.train(10, QGame, [i for i in range(10, 20, 10)], "complex_train_file.txt")
-    qsnake.train(100, QGame, [i for i in range(10, 200 + 10, 10)], "complex_train_file.txt")
+    qsnake.train(10, QGame, [i for i in range(10, 200 + 10, 10)], "complex_train_file.txt")
 
 if __name__ == "__main__":
     main()

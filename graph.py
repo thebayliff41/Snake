@@ -206,7 +206,7 @@ def main():
 
         y_norm = np.log(y_norm)
 
-        y_lin 
+        #y_lin 
         model_y = y_lin
 
         #Supa's way
@@ -218,7 +218,20 @@ def main():
 
     y_new = model.predict(x)
 
+    #Note: changing the values from the model won't make the fit as perfect, we 
+    #would have to apply the same transformation to the original data
+
+    print(y_new)
     y_new = np.log(y_new) #was indented
+    y_new = np.flip(y_new)
+
+    for index, ele in enumerate(y_new):
+        if np.isnan(ele): 
+            y_new[index] = 0
+            break
+
+    y_new = np.flip(y_new)
+    print("normal", y_new)
 
     plt.plot(x, y_new, color='red', label="linear-fit")
     #plt.plot(x, np.log(z), color='red', label="linear-fit")
