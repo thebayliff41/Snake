@@ -1,7 +1,8 @@
 #! /usr/bin/env python3
 
 import json
-from scipy.stats import describe, sem, t
+from scipy import stats
+from scipy.stats import describe, sem, t, linregress
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import normalize
@@ -81,7 +82,7 @@ def parseArgs():
     parser.add_argument('--with-variance', "-wv",  action="store_true")
     parser.add_argument('-describe', '-d', action="store_true")
     parser.add_argument('-suppress', '-s', action="store_true")
-    parser.add_argument('-linearize', '-l', action="store_true")
+    #parser.add_argument('-linearize', '-l', action="store_true")
     parser.add_argument('-confidence-interval', '-ci', action="store_true")
     parser.add_argument('-cutoff', '-co', type=int, default=0)
     parser.add_argument('-complex', '-cp', action="store_true")
@@ -179,6 +180,7 @@ def main():
 
     final_scores = []
     trials = []
+
     replications = data[0]['replications']
     for d in data:
         final_scores.append(d['final_scores'])
@@ -195,48 +197,35 @@ def main():
     model = LinearRegression()
 
     x = np.asarray(trials).reshape(-1, 1)
-    y = np.asarray([d.mean for d in describes]).reshape(-1, 1)
+
+    y = [d.mean for d in describes]
+    y = np.asarray(y).reshape(-1, 1)
+
     model_y = y
 
-    ax = plt.axes()
+    y_lin = np.exp(y) #Linearize y
 
-    if args.linearize:
-        y_lin = np.exp(y) #Linearize y
-        y_norm = np.copy(y_lin)
+    model.fit(x, y_lin)
 
-        y_norm = np.log(y_norm)
-
-        #y_lin 
-        model_y = y_lin
-
-        #Supa's way
-        b = np.mean(x * y) / np.mean(x * x)
-        z = b * x
-
-    model.fit(x, model_y)
-    plt.scatter(x, y)
+    plt.scatter(x, y, label = "original-data")
 
     y_new = model.predict(x)
 
-    #Note: changing the values from the model won't make the fit as perfect, we 
-    #would have to apply the same transformation to the original data
+    indexes = []
+    for index, value in enumerate(y_new):
+        if value < 0:
+            indexes += [index]
 
-    print(y_new)
-    y_new = np.log(y_new) #was indented
-    y_new = np.flip(y_new)
-
-    for index, ele in enumerate(y_new):
-        if np.isnan(ele): 
-            y_new[index] = 0
-            break
-
-    y_new = np.flip(y_new)
-    print("normal", y_new)
+    fixed_x = [x[indexes[0]], x[indexes[-1] + 1]]
+    y_new = np.log(y_new[indexes[-1] + 1:]) #was indented
+    x = x[indexes[-1] + 1:]
+    fixed_y = [1, y_new[0]]
 
     plt.plot(x, y_new, color='red', label="linear-fit")
-    #plt.plot(x, np.log(z), color='red', label="linear-fit")
-    #print(r2_score(y_new, logy))
-    print(f"y = {model.coef_}x + {model.intercept_}")
+    plt.plot(fixed_x, fixed_y, ':', color="red",  label="non-transformable")
+    plt.legend()
+    print(r2_score(y[indexes[-1] + 1:], y_new))
+    #print(f"y = ln({model.coef_}x + {model.intercept_})") #Equation of the line
 
     plt.ylabel("Mean")
     plt.xlabel("Number of Trials")
