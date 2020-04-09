@@ -105,43 +105,6 @@ def mean_confidence_interval(data, confidence=0.95):
     interval = standard_error * t.ppf((1 + confidence) / 2., number_of_elements-1)
     return average, average - interval, average + interval
 
-def makeAllGtZero(array):
-    """
-    Takes an array and modifies in place. Adds the lowest number to all members
-    of the array. 
-
-    :param array: numpy array containing data to edit
-    """
-    if not isinstance(array, np.ndarray):
-        raise ValueError(
-        f"The given array has type {type(data)} but should be of type {type(np.array([0]))}")
-
-    lowest = array.min() 
-    if lowest < 0:
-        with np.nditer(array, op_flags=['readwrite']) as it:
-            for value in it:
-                value[...] = abs(lowest) + value
-
-    else:
-        return
-
-def normalize(array):
-    """
-    Normalizes the data passeed into through the array. Array is changed in
-    place.
-
-    Keyword arguments:
-    array - numpy array containing data
-    """
-    if not isinstance(array, np.ndarray):
-        raise ValueError(
-        f"The given array has type {type(data)} but should be of type {type(np.array([0]))}")
-
-    array_max = np.max(array)
-    with np.nditer(array, op_flags=['readwrite']) as it:
-        for value in it:
-            value[...] = value/array_max
-
 def parseData(data_list, scores, confidence_interval = False, verbose = False):
     """
     Places the confidence interval data into the given list
