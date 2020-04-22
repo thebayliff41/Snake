@@ -82,7 +82,7 @@ class Game():
         elif key == pygame.K_j:
             self.snake.die()
         elif key == pygame.K_p:
-            self.speed = 1
+            self.speed = 0
         elif key == pygame.K_o:
             self.speed = 10
 

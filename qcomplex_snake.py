@@ -24,18 +24,18 @@ class QGame(complex_snake.Game):
         self.initText()
 
     def initText(self):
-        if self.watchTraining:
-            self.text.append(snake.DisplayText(self.screen, (10, 30), "Learning Rate: ", self.font, str(.1)))
-            self.text.append(snake.DisplayText(self.screen, (10, 50), "Discount Factor: ", self.font, str(.9)))
-            self.text.append(snake.DisplayText(self.screen, (10, 70), "Current Encoded State: ", self.font, self.current_state))
-            self.text.append(snake.DisplayText(self.screen, (10, 90), "Current Action: ", self.font, self.current_action))
-            self.text.append(snake.DisplayText(self.screen, (10, 110), "Current Reward: ", self.font, str(self.snake.getReward(self.current_state))))
-            self.text.append(snake.DisplayText(self.screen, (10, 130), "Current Q-Table entry: ", self.font))
-            self.text.append(snake.DisplayText(self.screen, (20, 150), "UP: ", self.font))
-            self.text.append(snake.DisplayText(self.screen, (20, 170), "DOWN: ", self.font))
-            self.text.append(snake.DisplayText(self.screen, (20, 190), "LEFT: ", self.font))
-            self.text.append(snake.DisplayText(self.screen, (20, 210), "RIGHT: ", self.font))
-            self.text.append(snake.DisplayText(self.screen, (20, 230), "Training: ", self.font, str(self.training)))
+        #if self.watchTraining:
+        self.text.append(snake.DisplayText(self.screen, (10, 30), "Learning Rate: ", self.font, str(.1)))
+        self.text.append(snake.DisplayText(self.screen, (10, 50), "Discount Factor: ", self.font, str(.9)))
+        self.text.append(snake.DisplayText(self.screen, (10, 70), "Current Encoded State: ", self.font, self.current_state))
+        self.text.append(snake.DisplayText(self.screen, (10, 90), "Current Action: ", self.font, self.current_action))
+        self.text.append(snake.DisplayText(self.screen, (10, 110), "Current Reward: ", self.font, str(self.snake.getReward(self.current_state))))
+        self.text.append(snake.DisplayText(self.screen, (10, 130), "Current Q-Table entry: ", self.font))
+        self.text.append(snake.DisplayText(self.screen, (20, 150), "UP: ", self.font))
+        self.text.append(snake.DisplayText(self.screen, (20, 170), "DOWN: ", self.font))
+        self.text.append(snake.DisplayText(self.screen, (20, 190), "LEFT: ", self.font))
+        self.text.append(snake.DisplayText(self.screen, (20, 210), "RIGHT: ", self.font))
+        self.text.append(snake.DisplayText(self.screen, (20, 230), "Training: ", self.font, str(self.training)))
 
     def userInput(self, key):
         """
@@ -164,44 +164,9 @@ class QTable(qsnake.QTable):
 
                 encoded_map.set(bit_position)
 
-class Snake(complex_snake.Snake):
-    def __init__(self, game):
-        super().__init__(game)
-        self.last_distance = self.distanceToFood()
-
-    def getReward(self, state):
-        """
-        Returns the reward of the state
-
-        Arguments:
-        state - the state that the snke is in
-        """
-        new_distance = self.distanceToFood()
-        if len(self.tail) > self.last_length:  # An apple was eaten
-            self.last_length=len(self.tail)
-            reward = 1
-        elif self.hit_wall or self.hit_self or self.hit_redirect:
-            reward = -100
-        elif new_distance < self.last_distance:
-            reward = .1
-        else:
-            reward = -.2
-
-        self.last_distance = new_distance
-
-        return reward
-        
-
 def main():
-    #game = QGame(training = True, watchTraining = True)
-    #for i in range(10):
-    #    game.play()
-    #    game.reset()
-
-    #game.play()
-        
-    #qsnake.train(10, QGame, [i for i in range(10, 20, 10)], "complex_train_file.txt")
-    qsnake.train(10, QGame, [i for i in range(10, 200 + 10, 10)], "complex_train_file.txt")
+    #qsnake.train(20, QGame, [i for i in range(10, 100, 10)], "complex_train_file.txt")
+    qsnake.train(100, QGame, [i for i in range(10, 400 + 10, 10)], "complex_train_file.txt")
 
 if __name__ == "__main__":
     main()

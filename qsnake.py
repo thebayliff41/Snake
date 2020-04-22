@@ -444,7 +444,6 @@ def experiment(game_type, replications, trials):
     for replication in range(0, replications):
         game.reset(newQ=True, learning_rate=.9)
         for trial in range(0, trials):
-            print(trial)
             game.play()
             game.reset()
         game.play()
@@ -474,7 +473,8 @@ def train(replications, game_type, trial_set, out_file_name=None):
     for trial in trial_set:
         formatted_input.append((game_type, replications, trial))
 
-    with multiprocessing.Pool(processes=8) as pool:
+    #with multiprocessing.Pool(processes=8) as pool:
+    with multiprocessing.Pool() as pool:
         results = pool.starmap(experiment, formatted_input)
 
     for final_scores, trials in zip(results, trial_set):
@@ -513,7 +513,8 @@ def train(replications, game_type, trial_set, out_file_name=None):
 
 def main():
     # 14 cols, 19 rows
-    train(100, QGame, [i for i in range(10, 200 + 10, 10)], "train_file.txt")
+    #train(100, QGame, [i for i in range(10, 200 + 10, 10)], "train_file.txt")
+    train(100, QGame, [i for i in range(10, 150 + 10, 10)], "train_file.txt")
     #train(50, [1, 2, 3, 4, 5, 6], "train_file.txt")
     #game = QGame(watchTraining=True)
     #game.play()

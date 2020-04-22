@@ -436,9 +436,10 @@ class Snake(qsnake.Snake):
 
         self.hitRedirect(newX, newY)
         if self.hit_redirect:
-            self.assist(tail=True)
-            self.checkEat(self.x, self.y)
-            return
+            self.die()
+            #self.assist(tail=True)
+            #self.checkEat(self.x, self.y)
+            #return
 
         if not self.checkEat(newX, newY):  
         # Only check if the snake hits itself if it didn't eat, 
@@ -465,6 +466,32 @@ class Snake(qsnake.Snake):
             if block.colliderect(newBlock):
                 self.hit_redirect = True
                 break
+
+    def getReward(self, state):
+        """
+        Returns the reward of the state
+
+        Arguments:
+        state - the state that the snke is in
+        """
+        new_distance = self.distanceToFood()
+        if len(self.tail) > self.last_length:  # An apple was eaten
+            self.last_length=len(self.tail)
+            reward = 1
+        elif self.hit_wall or self.hit_self or self.hit_redirect:
+            reward = -100
+        #elif self.last_distance == -1:
+        #    reward = 0
+        #    self.last_disatnce = 0
+        elif new_distance < self.last_distance:
+            reward = .1
+        else:
+            reward = -.2
+
+        self.last_distance = new_distance
+
+
+        return reward
         
 class Food(snake.Food):
     def __init__(self, game):

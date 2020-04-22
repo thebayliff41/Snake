@@ -86,6 +86,7 @@ def parseArgs():
     parser.add_argument('-confidence-interval', '-ci', action="store_true")
     parser.add_argument('-cutoff', '-co', type=int, default=0)
     parser.add_argument('-complex', '-cp', action="store_true")
+    parser.add_argument('-extrapolate', '-e', type=int, metavar='E')
     return parser.parse_args()
 
 def mean_confidence_interval(data, confidence=0.95):
@@ -116,7 +117,7 @@ def parseData(data_list, scores, confidence_interval = False, verbose = False):
         raise ValueError(
         f"The given data has type {type(data_list)} but should be of type list")
 
-    for data in scores:
+    for index, data in enumerate(scores):
         _, low, high = mean_confidence_interval(np.array(data))
 
         if confidence_interval:
@@ -127,8 +128,9 @@ def parseData(data_list, scores, confidence_interval = False, verbose = False):
                     data.remove(num)
 
         data_list.append(describe(data))
+
         if verbose:
-            print(describe(data))
+            print(index * 10 + 10, describe(data))
 
 def main():
     """Driver"""
@@ -172,6 +174,17 @@ def main():
 
     plt.scatter(x, y, label = "original-data")
 
+    if args.extrapolate:
+        if args.extrapolate < max(x)[0]:
+            raise ValueError(f"The value passed to the -e option is less than the "
+            "maximum value of the original data, {max(x)[0]}.")
+        elif args.extrapolate % 10 != 0:
+            raise ValueError("Extrapolation value must be a multiple of 10")
+
+        extrapolate_x = np.array([i for i in range(max(x)[0], args.extrapolate + 10, 10)]).reshape(-1, 1)
+        extrapolate_y = np.log(model.predict(extrapolate_x))
+        plt.plot(extrapolate_x, extrapolate_y, ':', color='green', label="projected-fit")
+
     y_new = model.predict(x)
 
     indexes = []
@@ -179,15 +192,24 @@ def main():
         if value < 0:
             indexes += [index]
 
-    fixed_x = [x[indexes[0]], x[indexes[-1] + 1]]
-    y_new = np.log(y_new[indexes[-1] + 1:]) #was indented
-    x = x[indexes[-1] + 1:]
-    fixed_y = [1, y_new[0]]
+    if indexes:
+        fixed_x = [x[indexes[0]], x[indexes[-1] + 1]]
+        #fixed_x = [x_new[indexes[0]], x_new[indexes[-1] + 1]]
+        x = x[indexes[-1] + 1:]
+        #x_new = x_new[indexes[-1] + 1:]
+        y_new = np.log(y_new[indexes[-1] + 1:]) #was indented
+        y = y[indexes[-1] + 1:] #was indented
+        fixed_y = [1, y_new[0]]
+        plt.plot(fixed_x, fixed_y, ':', color="red",  label="non-transformable")
+    else:
+        y_new = np.log(y_new) #was indented
 
+    #plt.plot(x, y_new, color='red', label="linear-fit")
     plt.plot(x, y_new, color='red', label="linear-fit")
-    plt.plot(fixed_x, fixed_y, ':', color="red",  label="non-transformable")
+
     plt.legend()
-    print(r2_score(y[indexes[-1] + 1:], y_new))
+    #print(r2_score(y[indexes[-1] + 1:], y_new))
+    print(r2_score(y, y_new))
     #print(f"y = ln({model.coef_}x + {model.intercept_})") #Equation of the line
 
     plt.ylabel("Mean")
