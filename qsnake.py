@@ -63,6 +63,7 @@ class QGame(snake.Game):
         elif key == pygame.K_s and self.pause and self.watchTraining:
             self.step()
             self.drawBoard()
+            pygame.display.flip()
         elif key == pygame.K_d: 
             if not self.watchTraining:
                 pygame.display.init()
@@ -217,6 +218,9 @@ class QTable(pd.DataFrame):
             self.loc[index]
         except KeyError:
             self.loc[index] = [0, 0, 0, 0]
+            direct = ~snake.getDirection()
+            name = direct.name
+            self.loc[index][name] = np.nan
         finally:
             return self.loc[index]
 
@@ -514,10 +518,13 @@ def train(replications, game_type, trial_set, out_file_name=None):
 def main():
     # 14 cols, 19 rows
     #train(100, QGame, [i for i in range(10, 200 + 10, 10)], "train_file.txt")
-    train(100, QGame, [i for i in range(10, 150 + 10, 10)], "train_file.txt")
+    #train(100, QGame, [i for i in range(10, 150 + 10, 10)], "train_file.txt")
     #train(50, [1, 2, 3, 4, 5, 6], "train_file.txt")
-    #game = QGame(watchTraining=True)
-    #game.play()
+    game = QGame(watchTraining=True)
+    for i in range(100):
+        game.play()
+        game.reset()
+    game.play()
     
 if __name__ == "__main__":
     main()

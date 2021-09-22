@@ -251,7 +251,7 @@ class Game(snake.Game):
 
     def __mapBlockSurrounding(self, block, blocks):
         """
-        Maps the surrounding of the 
+        Maps the surrounding of the block given
         """
         encoded_map = bitmap.BitMap(8) #8 Surrounding blocks
         total_walls = 0

@@ -166,7 +166,12 @@ class QTable(qsnake.QTable):
 
 def main():
     #qsnake.train(20, QGame, [i for i in range(10, 100, 10)], "complex_train_file.txt")
-    qsnake.train(100, QGame, [i for i in range(10, 400 + 10, 10)], "complex_train_file.txt")
+    #qsnake.train(100, QGame, [i for i in range(10, 400 + 10, 10)], "complex_train_file.txt")
+    game = QGame(watchTraining=True)
+    for i in range(100):
+        game.play()
+        game.reset()
+    game.play()
 
 if __name__ == "__main__":
     main()

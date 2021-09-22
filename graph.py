@@ -82,11 +82,12 @@ def parseArgs():
     parser.add_argument('--with-variance', "-wv",  action="store_true")
     parser.add_argument('-describe', '-d', action="store_true")
     parser.add_argument('-suppress', '-s', action="store_true")
-    #parser.add_argument('-linearize', '-l', action="store_true")
+    parser.add_argument('-linear', '-l', action="store_true")
     parser.add_argument('-confidence-interval', '-ci', action="store_true")
     parser.add_argument('-cutoff', '-co', type=int, default=0)
     parser.add_argument('-complex', '-cp', action="store_true")
     parser.add_argument('-extrapolate', '-e', type=int, metavar='E')
+    parser.add_argument('-raw', '-r', action="store_true")
     return parser.parse_args()
 
 def mean_confidence_interval(data, confidence=0.95):
@@ -171,8 +172,24 @@ def main():
     y_lin = np.exp(y) #Linearize y
 
     model.fit(x, y_lin)
+    y_new = model.predict(x)
+
+    plt.ylabel("Mean")
+    plt.xlabel("Number of Trials")
+    plt.figtext(.1, .9, f"Replications: {replications}")
+    plt.title("Average Snake length vs trials")
+
+    if args.linear:
+        plt.scatter(x, y_lin)
+        plt.plot(x, y_new, color='red', label="linear-fit")
+        plt.show()
+        exit()
 
     plt.scatter(x, y, label = "original-data")
+
+    if args.raw:
+        plt.show()
+        exit()
 
     if args.extrapolate:
         if args.extrapolate < max(x)[0]:
@@ -185,7 +202,6 @@ def main():
         extrapolate_y = np.log(model.predict(extrapolate_x))
         plt.plot(extrapolate_x, extrapolate_y, ':', color='green', label="projected-fit")
 
-    y_new = model.predict(x)
 
     indexes = []
     for index, value in enumerate(y_new):
@@ -194,17 +210,14 @@ def main():
 
     if indexes:
         fixed_x = [x[indexes[0]], x[indexes[-1] + 1]]
-        #fixed_x = [x_new[indexes[0]], x_new[indexes[-1] + 1]]
         x = x[indexes[-1] + 1:]
-        #x_new = x_new[indexes[-1] + 1:]
-        y_new = np.log(y_new[indexes[-1] + 1:]) #was indented
-        y = y[indexes[-1] + 1:] #was indented
+        y_new = np.log(y_new[indexes[-1] + 1:]) 
+        y = y[indexes[-1] + 1:] 
         fixed_y = [1, y_new[0]]
         plt.plot(fixed_x, fixed_y, ':', color="red",  label="non-transformable")
     else:
-        y_new = np.log(y_new) #was indented
+        y_new = np.log(y_new) 
 
-    #plt.plot(x, y_new, color='red', label="linear-fit")
     plt.plot(x, y_new, color='red', label="linear-fit")
 
     plt.legend()
@@ -212,10 +225,6 @@ def main():
     print(r2_score(y, y_new))
     #print(f"y = ln({model.coef_}x + {model.intercept_})") #Equation of the line
 
-    plt.ylabel("Mean")
-    plt.xlabel("Number of Trials")
-    plt.figtext(.1, .9, f"Replications: {replications}")
-    plt.title("Average Snake length vs trials")
 
     if not args.suppress:
         plt.show()
